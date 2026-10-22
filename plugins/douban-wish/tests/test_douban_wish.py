@@ -4,21 +4,29 @@
 全在模块顶层的纯函数里，界面改版时最容易坏的就是这几处，所以钉在这里。
 """
 
+import os
+import sys
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 
-from douban_wish import (
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _bootstrap  # noqa: F401,E402 -- 先把桩模块装好，下面才能导入
+from douban_wish import (  # noqa: E402
     CST,
+    baseline_string,
     cutoff_string,
     cjk_number,
     in_window,
+    is_permanent_error,
     normalize_user,
     normalize_users,
     parse_wishes,
     pick_candidates,
     plan_for,
     season_marker,
+    seasons_missing,
 )
+from movieclaw_sdk.ops import OpsError
 
 
 class NormalizeUserTest(unittest.TestCase):
@@ -199,6 +207,74 @@ class PickCandidatesTest(unittest.TestCase):
 
     def test_none(self):
         self.assertEqual(pick_candidates(None), [])
+
+
+class BaselineStringTest(unittest.TestCase):
+    def test_no_baseline(self):
+        self.assertIsNone(baseline_string(None))
+        self.assertIsNone(baseline_string(0))
+        self.assertIsNone(baseline_string(""))
+        self.assertIsNone(baseline_string(-1))
+
+    def test_stamp_is_beijing_time(self):
+        # 2026-10-22 04:00:00 UTC == 2026-10-22 12:00:00 北京时间
+        stamp = datetime(2026, 10, 22, 4, 0, 0, tzinfo=timezone.utc).timestamp()
+        self.assertEqual(baseline_string(stamp), "2026-10-22 12:00:00")
+
+    def test_result_is_comparable_with_douban_time(self):
+        # 关键性质：基线和豆瓣返回的 create_time 同格式，能直接按字符串比大小
+        stamp = datetime(2026, 10, 22, 12, 0, 0, tzinfo=CST).timestamp()
+        floor = baseline_string(stamp)
+        self.assertEqual(floor, "2026-10-22 12:00:00")
+        self.assertTrue(in_window("2026-10-22 12:00:00", floor))
+        self.assertFalse(in_window("2026-10-22 11:59:59", floor))
+
+    def test_accepts_string_of_number(self):
+        # 从插件存储里读回来可能是字符串
+        stamp = datetime(2026, 10, 22, 12, 0, 0, tzinfo=CST).timestamp()
+        self.assertEqual(baseline_string(str(stamp)), "2026-10-22 12:00:00")
+
+
+class IsPermanentErrorTest(unittest.TestCase):
+    def exc(self, status):
+        err = OpsError("op", "boom")
+        err.status = status
+        return err
+
+    def test_client_errors_are_permanent(self):
+        for status in (400, 404, 409, 422):
+            self.assertTrue(is_permanent_error(self.exc(status)), status)
+
+    def test_transient_errors_are_not_permanent(self):
+        for status in (401, 403, 408, 425, 429, 500, 502, 503):
+            self.assertFalse(is_permanent_error(self.exc(status)), status)
+
+    def test_missing_status_is_not_permanent(self):
+        # 拿不到状态码（网络层直接抛）时宁可下轮重试，也不要永久放弃
+        self.assertFalse(is_permanent_error(OpsError("op", "boom")))
+        self.assertFalse(is_permanent_error(self.exc("500")))
+        self.assertFalse(is_permanent_error(self.exc(None)))
+
+
+class SeasonsMissingTest(unittest.TestCase):
+    def test_all_selected(self):
+        self.assertEqual(seasons_missing([1, 2], [1, 2]), [])
+        self.assertEqual(seasons_missing([1], [1, 2]), [])
+
+    def test_some_missing(self):
+        self.assertEqual(seasons_missing([1, 2, 3], [1, 3]), [2])
+
+    def test_string_seasons_from_host(self):
+        self.assertEqual(seasons_missing([1, 2], ["1"]), [2])
+
+    def test_unusable_reply_is_not_reported(self):
+        # 宿主没回这个字段时不该报「全丢了」，否则每轮都误报
+        self.assertEqual(seasons_missing([1, 2], None), [])
+        self.assertEqual(seasons_missing([1, 2], []), [1, 2])
+        self.assertEqual(seasons_missing([], [1]), [])
+
+    def test_garbage_entries_are_ignored(self):
+        self.assertEqual(seasons_missing([1], [None, "x", 1]), [])
 
 
 if __name__ == "__main__":

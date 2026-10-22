@@ -1,5 +1,23 @@
 # 更新记录
 
+## 1.1.0 - 2026-10-22
+
+按上游 review 修正。
+
+- **修 `source_title_ref` 用错（会 400）**：原条目本身就是 `tmdb:` 引用时，`create_body` 和
+  `resolve` 把条目的 tmdb 引用塞进了 `source_title_ref`，而宿主只接受豆瓣引用，直接返回
+  400「source_title_ref 仅接受原始豆瓣 title_ref」。现在只在「原条目是豆瓣、从歧义候选里改选
+  了 TMDB」时才带，值为原豆瓣引用。
+- **第一次同步默认值改为 `since_now`**：原来默认 `history`（当前榜上的全订），装上一跑就把
+  几十条热门一次性压进订阅队列。想全订的仍可在设置里选 `history`。
+- **临时失败不再写进 `done`**：5xx、超时、鉴权过期、429 这些下一轮会重试；只有明确的 4xx
+  才算永久失败。临时失败也不占本轮预算，`remaining` 如实计入待重试的条数。
+- **季核对**：`subscriptions.create` 偶尔会「成功但把选季丢掉」（TMDB 里没这一季时），接口不
+  报错、订阅却是空的。建完订阅后拿宿主返回的 `selected_seasons` 对一遍，丢了就在日志里记一条
+  警告、并在成功提示里写明「实际没选上第 N 季，去订阅详情里手动确认」。
+- 补 `LICENSE`（MIT），`store.json` 的 `license` 由「见仓库许可证」改为 `MIT`。
+- 为 `select_titles` / `is_permanent_error` / `seasons_missing` 补单测。
+
 ## 1.0.0 - 2026-10-21
 
 首个版本。

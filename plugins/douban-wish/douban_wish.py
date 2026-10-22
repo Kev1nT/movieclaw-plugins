@@ -20,6 +20,7 @@
 想连已有的也订，把设置里的「第一次同步」改成「连已有的也订」。
 """
 
+import asyncio
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -45,6 +46,9 @@ DONE_LIMIT = 800        # 记多少条处理过的豆瓣条目（插件数据单
 PENDING_LIMIT = 50
 RECENT_SIZE = 60
 
+FETCH_RETRIES = 3       # 403 / 429 / 5xx 最多再试几次（风控限流多半等一会儿就过）
+FETCH_BACKOFF = 2.0     # 第一次退避 2 秒，之后 4、8 秒
+
 DONE_KEY = "done"             # [豆瓣条目 id, …]，最近处理的在前
 PENDING_KEY = "pending"       # {豆瓣条目 id: {title, kind, reason, candidates, user, at}}
 STATS_KEY = "stats"           # {"runs", "subscribed", "skipped", "failed", "waiting"}
@@ -55,6 +59,7 @@ MOBILE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/
 WISH_STATUS = "mark"          # 豆瓣的「想看」
 WANTED_KINDS = ("movie", "tv")
 SKIPPED = "已经有订阅，跳过"
+TEMPORARY_PREFIX = "暂时失败"   # 临时故障（5xx / 超时 / 限流）：不记账，下一轮重试
 # 豆瓣的收藏时间按北京时间给，比较时也按北京时间算窗口
 CST = timezone(timedelta(hours=8))
 
@@ -216,6 +221,49 @@ def in_window(created: str, cutoff: str | None) -> bool:
     return cutoff is None or created >= cutoff
 
 
+def baseline_string(stamp) -> str | None:
+    """基线时间戳 → 和豆瓣收藏时间同格式的字符串（北京时间）；没有基线返回 None。
+
+    有了它才能判断「这条想看是不是基线之前就有的」：``done`` 名单只有 800 条，
+    攒满后老条目会被挤掉，下次翻到就会被当成新的重新订阅一遍。
+    """
+    value = float(stamp or 0)
+    if value <= 0:
+        return None
+    return datetime.fromtimestamp(value, CST).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def is_permanent_error(exc: OpsError) -> bool:
+    """这次订阅失败是不是「重试也没用」。
+
+    只有明确的客户端错误才算（参数不对、被拒绝）。5xx、超时、429、鉴权过期
+    都是暂时的，下一轮该再试——写进 ``done`` 名单等于永久放弃这条想看。
+    """
+    status = getattr(exc, "status", None)
+    if not isinstance(status, int):
+        return False
+    if status >= 500 or status in (401, 403, 408, 425, 429):
+        return False
+    return 400 <= status < 500
+
+
+def seasons_missing(wanted: list[int], got) -> list[int]:
+    """宿主实际建上的季 vs 我们想要的季 → 没建上的那些。
+
+    ``subscriptions.create`` 偶尔会「成功但把选季丢掉」（TMDB 里没这一季时），
+    接口不报错、订阅却是空的。``got`` 不是列表时无从判断，返回空表示不追究。
+    """
+    if not isinstance(got, list):
+        return []
+    have = set()
+    for value in got:
+        try:
+            have.add(int(value))
+        except (TypeError, ValueError):
+            continue
+    return [int(season) for season in wanted or [] if int(season) not in have]
+
+
 def cjk_number(text: str) -> int | None:
     """「十」「十二」「二十一」这类中文数字 → 整数（只处理 0～99）。"""
     if text.isdigit():
@@ -309,13 +357,29 @@ async def apply(ctx: Context) -> None:
         async with httpx.AsyncClient(
             transport=net.http_transport(PLUGIN_ID), timeout=20, headers=headers
         ) as client:
-            response = await client.get(
-                url, params={"start": start, "count": PAGE_SIZE, "for_mobile": 1}
-            )
+            attempt = 0
+            while True:
+                response = await client.get(
+                    url, params={"start": start, "count": PAGE_SIZE, "for_mobile": 1}
+                )
+                # 403 / 5xx 未必是「收藏不公开」，多半是豆瓣风控（翻页太快、IP 被限流）。
+                # 退避重试几次，别一撞上就把整个账号判成读不到。
+                retryable = response.status_code in (403, 429) or response.status_code >= 500
+                if not retryable or attempt >= FETCH_RETRIES:
+                    break
+                attempt += 1
+                await asyncio.sleep(FETCH_BACKOFF * (2 ** (attempt - 1)))
         if response.status_code == 404:
             raise DoubanUnavailable("豆瓣没有这个用户：ID 写错了，或者对方已经注销")
-        if response.status_code in (401, 403):
+        if response.status_code == 403:
+            raise DoubanUnavailable(
+                "豆瓣拒绝读取这个账号的收藏：多半是收藏没公开；如果确认公开，"
+                "那是豆瓣风控在限流，过一阵再试（也可以在设置里给这个插件配代理）"
+            )
+        if response.status_code == 401:
             raise DoubanUnavailable("这个豆瓣账号的收藏不公开，读不到想看列表")
+        if response.status_code == 429:
+            raise DoubanUnavailable("豆瓣在限流（HTTP 429），这一轮先跳过，过一阵再试")
         if response.status_code >= 500:
             raise DoubanUnavailable(f"豆瓣返回 HTTP {response.status_code}，稍后再试")
         if response.status_code != 200:
@@ -397,31 +461,53 @@ async def apply(ctx: Context) -> None:
         return body
 
     async def create(wish: Wish, title_ref: str) -> dict:
-        """建订阅；剧集季号在 TMDB 不存在时退回「只追以后的新集」。"""
+        """建订阅；剧集季号在 TMDB 不存在时退回「只追以后的新集」。
+
+        两条路都要处理：宿主**明确报错**说没有这一季（400 带「季」），
+        和宿主**只回成功却把 selected_seasons 丢掉**。只信自己的 ``plan_for``
+        会给用户一个「按第 3 季订阅」的假回执，实际一集都不会下。
+        """
         seasons, why = plan_for(wish.title, wish.kind)
+        body = create_body(wish, title_ref)
+        fell_back = False
         try:
-            created = await ops.call("subscriptions.create", create_body(wish, title_ref))
+            created = await ops.call("subscriptions.create", body)
         except OpsError as exc:
             no_such_season = wish.kind == "tv" and exc.status == 400 and "季" in (exc.message or "")
             if not no_such_season:
                 raise
-            fallback = await ops.call(
-                "subscriptions.create",
-                {
-                    "title_ref": title_ref,
-                    "selected_seasons": [],
-                    "follow_future": True,
-                    "source_title_ref": f"douban:{wish.douban_id}",
-                },
-            )
-            sub = (fallback or {}).get("subscription") or {}
+            fell_back = True
+            # 只追以后的新集：季号留空，必须靠 follow_future 撑着，否则会落库成 0 工单
+            body.update(selected_seasons=[], follow_future=True)
+            created = await ops.call("subscriptions.create", body)
+        sub = (created or {}).get("subscription") or {}
+        if fell_back:
             wanted = seasons[0] if seasons else "?"
             return {
                 "subscription": sub,
                 "why": f"{why}，但 TMDB 里没有第 {wanted} 季，已改成只追以后播出的新集",
             }
-        sub = (created or {}).get("subscription") or {}
-        return {"subscription": sub, "why": why}
+        missing = seasons_missing(seasons, sub.get("selected_seasons"))
+        if not missing:
+            return {"subscription": sub, "why": why}
+        # 宿主把这些季丢了：如实告知，别再假装订上了
+        log.warning(
+            "《%s》(%s) 订阅 %s 没建上第 %s 季：宿主返回的 selected_seasons=%r",
+            wish.title,
+            wish.douban_id,
+            sub.get("id"),
+            "、".join(str(s) for s in missing),
+            sub.get("selected_seasons"),
+        )
+        return {
+            "subscription": sub,
+            "why": (
+                f"{why}，但订阅 #{sub.get('id')} 实际没选上第 "
+                f"{'、'.join(str(s) for s in missing)} 季（TMDB 里可能没有这一季），"
+                "去订阅详情里手动确认一下"
+            ),
+            "seasons_missing": missing,
+        }
 
     async def handle(wish: Wish, user: str, subscribed: set[str]) -> str:
         """一条想看 → 结果描述。"""
@@ -438,6 +524,19 @@ async def apply(ctx: Context) -> None:
             if exc.status == 404:
                 await hold(wish, "TMDB 里还没收录这部，等收录后再来", user)
                 return "待确认（TMDB 暂无）"
+            # 5xx / 超时 / 429 是宿主或网络的临时故障：**不能写进 done**，
+            # 否则这条想看就被永久放弃，等宿主恢复了也不会再订。
+            if not is_permanent_error(exc):
+                await bump("failed")
+                await recent(f"《{wish.title}》订阅暂时失败，下一轮重试：{exc.message}")
+                log.warning(
+                    "《%s》(%s) 订阅暂时失败（HTTP %s），本轮不记账，下一轮重试：%s",
+                    wish.title,
+                    wish.douban_id,
+                    exc.status,
+                    exc.message,
+                )
+                return f"{TEMPORARY_PREFIX}（下一轮重试）：{exc.message}"
             await mark_done(wish.douban_id)
             await bump("failed")
             await recent(f"《{wish.title}》订阅失败：{exc.message}")
@@ -518,15 +617,30 @@ async def apply(ctx: Context) -> None:
             }
 
         if user not in marks:
+            # first_run=history：这一轮就是要把现有的都订一遍，所以只记下基线、
+            # 不拿它当闸门（否则刚写的基线会把自己这轮该订的全挡掉）
             marks[user] = int(time.time())
             await store.set(BASELINE_KEY, marks)
-
-        queue = [wish for wish in wishes if wish.douban_id not in seen]
+            floor = None
+        else:
+            # done 名单只有 DONE_LIMIT 条，攒满后老条目会被挤掉。翻页时又可能翻到它们，
+            # 于是被当成新的再订一遍。基线时间就是第二道闸：收藏时间早于基线的，根本没
+            # 可能是「建立基线之后新点的」，一律不订。
+            floor = baseline_string(marks.get(user))
+        stale = [wish for wish in wishes if floor and wish.created < floor]
+        queue = [
+            wish
+            for wish in wishes
+            if wish.douban_id not in seen and not (floor and wish.created < floor)
+        ]
+        if stale:
+            log.debug("%s：%d 条想看的收藏时间早于基线，跳过", user, len(stale))
         return {
             "user": user,
             "pages": gathered["pages"],
             "total_interests": gathered["total"],
             "in_window": len(wishes),
+            "before_baseline": len(stale),
             "queue": queue,
             "handled": 0,
             "results": [],
@@ -577,11 +691,17 @@ async def apply(ctx: Context) -> None:
                             "result": result,
                         }
                     )
-                    # 已经有订阅的等于没干活，不占这一轮的额度
-                    if result != SKIPPED:
+                    # 已经有订阅的等于没干活，不占这一轮的额度；暂时失败的也不算干活
+                    # （这条想看没被记成 done，下一轮还会再来，额度留给真正订上的）
+                    if result != SKIPPED and not result.startswith(TEMPORARY_PREFIX):
                         budget -= 1
                 row["handled"] = len(row["queue"]) - len(left)
-                row["remaining"] = len(left)
+                row["remaining"] = len(left) + sum(
+                    1
+                    for item in handled
+                    if item["user"] == row["user"]
+                    and item["result"].startswith(TEMPORARY_PREFIX)
+                )
                 row.pop("queue", None)
 
             baseline = sum(row.get("baseline", 0) for row in per_user)
@@ -592,6 +712,7 @@ async def apply(ctx: Context) -> None:
                 "within_days": config.within_days,
                 "cutoff": cutoff,
                 "new": sum(row.get("in_window", 0) for row in per_user),
+                "before_baseline": sum(row.get("before_baseline", 0) for row in per_user),
                 "handled": len(handled),
                 "remaining": sum(row.get("remaining", 0) for row in per_user),
                 "baseline": baseline,
@@ -742,7 +863,19 @@ async def apply(ctx: Context) -> None:
         await store.set(PENDING_KEY, rows)
         await bump("subscribed")
         await recent(f"《{item.get('title')}》手动确认后已订阅 #{sub.get('id')}")
-        return {"ok": True, "subscription_id": sub.get("id"), "title": item.get("title")}
+        # 和自动路径同一个口径：宿主把选季丢了就说出来，别给假回执
+        missing = seasons_missing(seasons, sub.get("selected_seasons"))
+        return {
+            "ok": True,
+            "subscription_id": sub.get("id"),
+            "title": item.get("title"),
+            "warning": (
+                f"订阅建上了，但第 {'、'.join(str(s) for s in missing)} 季没选上"
+                "（TMDB 里可能没有这一季）"
+                if missing
+                else ""
+            ),
+        }
 
     routes.mount(ctx, router)
 

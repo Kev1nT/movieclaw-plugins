@@ -76,6 +76,10 @@ RECENT_SIZE = 60
 DEFAULT_FETCH_LIMIT = 30     # 一个片单一轮读多少条（设置里限了前 N 名时按 N 读）
 MAX_PER_RUN_CEILING = 50
 
+# 结果文案前缀：临时失败的条目不记 done、不占本轮预算，下一轮重试
+TEMPORARY_PREFIX = "暂时失败"
+SKIPPED = "已经有订阅，跳过"
+
 _CN_DIGITS = {
     "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
     "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
@@ -135,11 +139,11 @@ class Config(BaseModel):
         le=MAX_PER_RUN_CEILING,
     )
     first_run: Literal["since_now", "history"] = Field(
-        "history",
+        "since_now",
         title="第一次同步",
         description=(
-            "history = 当前榜上的全都订（默认，会分几轮订完）；"
-            "since_now = 只订以后新进榜的，现在的榜只当历史"
+            "since_now = 只订以后新进榜的，现在的榜当历史（默认，装上一键就跑不会一次性订一堆）；"
+            "history = 当前榜上的全都订（会分几轮订完）"
         ),
     )
     tv_backfill: bool = Field(
@@ -250,6 +254,38 @@ def season_plan(title: str, kind: str, backfill: bool) -> tuple[list[int], bool,
     if season is not None:
         return [season], follow, f"按第 {season} 季订阅"
     return [1], follow, "标题没写第几季，按第 1 季订阅"
+
+
+def is_permanent_error(exc: OpsError) -> bool:
+    """这次订阅失败是不是「重试也没用」。
+
+    只有明确的客户端错误才算（参数不对、被拒绝）。5xx、超时、429、鉴权过期都是
+    暂时的，下一轮该再试——写进 ``done`` 名单等于永久放弃这条，而热门榜上的片子
+    掉出榜再进榜是常态，误记一次就再也订不上了。
+    """
+    status = getattr(exc, "status", None)
+    if not isinstance(status, int):
+        return False
+    if status >= 500 or status in (401, 403, 408, 425, 429):
+        return False
+    return 400 <= status < 500
+
+
+def seasons_missing(wanted: list[int], got) -> list[int]:
+    """宿主实际建上的季 vs 我们想要的季 → 没建上的那些。
+
+    ``subscriptions.create`` 偶尔会「成功但把选季丢掉」（TMDB 里没这一季时），
+    接口不报错、订阅却是空的。``got`` 不是列表时无从判断，返回空表示不追究。
+    """
+    if not isinstance(got, list):
+        return []
+    have = set()
+    for value in got:
+        try:
+            have.add(int(value))
+        except (TypeError, ValueError):
+            continue
+    return [int(season) for season in wanted or [] if int(season) not in have]
 
 
 def keyword_hit(title: str, keywords: list[str] | tuple[str, ...]) -> str | None:
@@ -511,8 +547,9 @@ async def apply(ctx: Context) -> None:
         if kind == "tv":
             # 不补已播出的集时季号留空，必须靠追新撑着，否则订阅会落库成 0 工单
             body["follow_future"] = bool(config.tv_follow_future) if seasons else True
-        if title_ref.startswith("tmdb:"):
-            # 从豆瓣歧义候选里改选了 TMDB 条目：把豆瓣身份带回去，之后按豆瓣集数对账
+        if title_ref.startswith("tmdb:") and str(item.get("title_ref") or "").startswith("douban:"):
+            # 从豆瓣歧义候选里改选了 TMDB 条目：把豆瓣身份带回去，之后按豆瓣集数对账。
+            # 宿主只接受豆瓣引用，条目本身是 tmdb 时不能把 tmdb 引用塞进来（会 400）。
             body["source_title_ref"] = str(item["title_ref"])
         return body, why
 
@@ -529,6 +566,18 @@ async def apply(ctx: Context) -> None:
             created = await ops.call("subscriptions.create", body)
             why = f"{why}，但 TMDB 里没有这一季，已改成只追以后播出的新集"
         sub = (created or {}).get("subscription") or {}
+        wanted = body.get("selected_seasons") or []
+        missing = seasons_missing(wanted, sub.get("selected_seasons"))
+        if missing:
+            log.warning(
+                "《%s》(%s) 订阅 %s 没建上第 %s 季：宿主返回的 selected_seasons=%r",
+                item.get("title"), item.get("title_ref"), sub.get("id"),
+                "、".join(str(s) for s in missing), sub.get("selected_seasons"),
+            )
+            why = (
+                f"{why}，但订阅实际没选上第 {'、'.join(str(s) for s in missing)} 季"
+                "（TMDB 里可能没有这一季），去订阅详情里手动确认一下"
+            )
         return {"subscription": sub, "why": why}
 
     async def handle(item: dict, douban_ids: set[str], keys: set[str]) -> str:
@@ -537,7 +586,7 @@ async def apply(ctx: Context) -> None:
         if already_subscribed(item, douban_ids, keys):
             await mark_done(str(item["title_ref"]))
             await bump("skipped")
-            return "已经有订阅，跳过"
+            return SKIPPED
         try:
             result = await subscribe(item)
         except OpsError as exc:
@@ -547,6 +596,14 @@ async def apply(ctx: Context) -> None:
             if exc.status == 404:
                 await hold(item, "TMDB 里还没收录这部，等收录后再来", None)
                 return "待确认（TMDB 暂无）"
+            if not is_permanent_error(exc):
+                # 临时失败：不写 done，下一轮还会再试（榜单会一直读到它）
+                await bump("failed")
+                await recent(f"《{title}》订阅暂时失败，下一轮重试：{exc.message}")
+                log.warning(
+                    "《%s》(%s) 订阅暂时失败，下一轮重试：%s", title, item.get("title_ref"), exc.message
+                )
+                return f"{TEMPORARY_PREFIX}（下一轮重试）：{exc.message}"
             await mark_done(str(item["title_ref"]))
             await bump("failed")
             await recent(f"《{title}》订阅失败：{exc.message}")
@@ -682,11 +739,17 @@ async def apply(ctx: Context) -> None:
             douban_ids, keys = await existing()
             handled: list[dict] = []
             subscribed = 0
+            retry = 0
             for item in queue:
                 if budget <= 0:
                     break
                 result = await handle(item, douban_ids, keys)
-                if result != "已经有订阅，跳过":
+                # 已有订阅跳过、临时失败都不占预算：前者没花钱，后者下一轮还要再来
+                if result == SKIPPED:
+                    pass
+                elif result.startswith(TEMPORARY_PREFIX):
+                    retry += 1
+                else:
                     budget -= 1
                     if "订阅 #" in result:
                         subscribed += 1
@@ -703,7 +766,8 @@ async def apply(ctx: Context) -> None:
                 "in_window": len(queue),
                 "handled": len(handled),
                 "subscribed": subscribed,
-                "remaining": max(len(queue) - len(handled), 0),
+                # 没轮到的 + 这轮临时失败要重试的
+                "remaining": max(len(queue) - len(handled), 0) + retry,
                 "skipped": skipped[:30],
                 "results": handled,
                 "errors": errors,
@@ -861,7 +925,9 @@ async def apply(ctx: Context) -> None:
         payload: dict = {"title_ref": target, "selected_seasons": seasons}
         if kind == "tv":
             payload["follow_future"] = bool(follow)
-        if target.startswith("tmdb:"):
+        if target.startswith("tmdb:") and body.title_ref.startswith("douban:"):
+            # 只有「原条目是豆瓣、改选了 TMDB 候选」时才带原始豆瓣引用；
+            # 宿主只接受豆瓣引用，原条目本身就是 tmdb 时带上会 400。
             payload["source_title_ref"] = body.title_ref
         try:
             try:

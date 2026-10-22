@@ -1,7 +1,7 @@
 [plugin]
 id = "douban-wish"
 title = "豆瓣想看同步"
-version = "1.0.0"
+version = "1.1.0"
 entry = "douban_wish"
 runtime = "process"
 sdk = "^1.0"

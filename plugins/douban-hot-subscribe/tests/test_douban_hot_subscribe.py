@@ -4,16 +4,24 @@
 改榜单口径时最容易坏的就是这几处，所以钉在这里。
 """
 
+import os
+import sys
 import unittest
 
-from douban_hot_subscribe import (
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _bootstrap  # noqa: F401,E402 -- 先把桩模块装好，下面才能导入
+from douban_hot_subscribe import (  # noqa: E402
+    is_permanent_error,
     keyword_hit,
     interleave,
     normalize_collections,
     pick_candidates,
     season_plan,
+    seasons_missing,
+    select_titles,
     title_key,
 )
+from movieclaw_sdk.ops import OpsError
 
 
 class NormalizeCollectionsTest(unittest.TestCase):
@@ -103,6 +111,132 @@ class PickCandidatesTest(unittest.TestCase):
 
     def test_none(self):
         self.assertEqual(pick_candidates(None), [])
+
+
+def _row(ref, title, rank, rating=8.0, collection="a", **extra):
+    return {
+        "title_ref": ref,
+        "title": title,
+        "rank": rank,
+        "provider_rating": rating,
+        "collection": collection,
+        **extra,
+    }
+
+
+class SelectTitlesTest(unittest.TestCase):
+    def test_plain_queue(self):
+        rows = [_row("douban:movie:1", "甲", 1), _row("douban:movie:2", "乙", 2)]
+        queue, skipped = select_titles(rows)
+        self.assertEqual([row["title_ref"] for row in queue], ["douban:movie:1", "douban:movie:2"])
+        self.assertEqual(skipped, [])
+
+    def test_drops_entries_already_done(self):
+        rows = [_row("douban:movie:1", "甲", 1), _row("douban:movie:2", "乙", 2)]
+        queue, skipped = select_titles(rows, done={"douban:movie:1"})
+        self.assertEqual([row["title_ref"] for row in queue], ["douban:movie:2"])
+        # 已处理的不算「跳过」，不该在状态里刷一屏
+        self.assertEqual(skipped, [])
+
+    def test_drops_entries_without_ref_or_title(self):
+        rows = [
+            {"title_ref": "", "title": "没有引用", "rank": 1},
+            {"title_ref": "douban:movie:9", "title": "  ", "rank": 2},
+            _row("douban:movie:1", "甲", 3),
+        ]
+        queue, _ = select_titles(rows)
+        self.assertEqual([row["title_ref"] for row in queue], ["douban:movie:1"])
+
+    def test_dedupes_same_ref_across_collections(self):
+        rows = [
+            _row("douban:movie:1", "甲", 1, collection="a"),
+            _row("douban:movie:1", "甲", 1, collection="b"),
+        ]
+        queue, _ = select_titles(rows)
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["collection"], "a")
+
+    def test_max_rank_with_reason(self):
+        rows = [_row("douban:movie:1", "甲", 1), _row("douban:movie:2", "乙", 5)]
+        queue, skipped = select_titles(rows, max_rank=3)
+        self.assertEqual([row["title_ref"] for row in queue], ["douban:movie:1"])
+        self.assertEqual(len(skipped), 1)
+        self.assertIn("第 5", skipped[0]["reason"])
+
+    def test_min_rating(self):
+        rows = [_row("douban:movie:1", "甲", 1, rating=8.5), _row("douban:movie:2", "乙", 2, rating=5.0)]
+        queue, skipped = select_titles(rows, min_rating=6.0)
+        self.assertEqual([row["title_ref"] for row in queue], ["douban:movie:1"])
+        self.assertIn("低于下限", skipped[0]["reason"])
+
+    def test_unrated_kept_by_default_dropped_on_request(self):
+        rows = [_row("douban:movie:1", "甲", 1, rating=0)]
+        self.assertEqual(len(select_titles(rows)[0]), 1)
+        queue, skipped = select_titles(rows, skip_unrated=True)
+        self.assertEqual(queue, [])
+        self.assertIn("评分", skipped[0]["reason"])
+
+    def test_exclude_keywords(self):
+        rows = [_row("douban:tv:1", "某综艺", 1), _row("douban:tv:2", "某剧", 2)]
+        queue, skipped = select_titles(rows, exclude_keywords=["综艺"])
+        self.assertEqual([row["title_ref"] for row in queue], ["douban:tv:2"])
+        self.assertIn("综艺", skipped[0]["reason"])
+
+    def test_owned_in_library_skipped(self):
+        rows = [
+            _row("douban:movie:1", "甲", 1, library_status={"file_count": 1}),
+            _row("douban:movie:2", "乙", 2, library_status={"file_count": 0}),
+        ]
+        queue, skipped = select_titles(rows, skip_owned=True)
+        self.assertEqual([row["title_ref"] for row in queue], ["douban:movie:2"])
+        self.assertIn("媒体库", skipped[0]["reason"])
+        # 关掉这项就都订
+        self.assertEqual(len(select_titles(rows, skip_owned=False)[0]), 2)
+
+    def test_rank_defaults_to_position(self):
+        rows = [{"title_ref": "douban:movie:1", "title": "甲", "provider_rating": 8}]
+        queue, _ = select_titles(rows)
+        self.assertEqual(queue[0]["rank"], 1)
+
+
+class IsPermanentErrorTest(unittest.TestCase):
+    def exc(self, status):
+        err = OpsError("op", "boom")
+        err.status = status
+        return err
+
+    def test_client_errors_are_permanent(self):
+        for status in (400, 404, 409, 422):
+            self.assertTrue(is_permanent_error(self.exc(status)), status)
+
+    def test_transient_errors_are_not_permanent(self):
+        for status in (401, 403, 408, 425, 429, 500, 502, 503):
+            self.assertFalse(is_permanent_error(self.exc(status)), status)
+
+    def test_missing_status_is_not_permanent(self):
+        self.assertFalse(is_permanent_error(OpsError("op", "boom")))
+        self.assertFalse(is_permanent_error(self.exc(None)))
+
+
+class SeasonsMissingTest(unittest.TestCase):
+    def test_all_selected(self):
+        self.assertEqual(seasons_missing([1, 2], [1, 2]), [])
+        self.assertEqual(seasons_missing([1], [1, 2]), [])
+
+    def test_some_missing(self):
+        self.assertEqual(seasons_missing([1, 2, 3], [1, 3]), [2])
+
+    def test_string_seasons_from_host(self):
+        self.assertEqual(seasons_missing([1, 2], ["1"]), [2])
+
+    def test_unusable_reply_is_not_reported(self):
+        # 宿主没回这个字段时不该报「全丢了」，否则每轮都误报
+        self.assertEqual(seasons_missing([1, 2], None), [])
+        self.assertEqual(seasons_missing([1, 2], []), [1, 2])
+        self.assertEqual(seasons_missing([], [1]), [])
+
+    def test_garbage_entries_are_ignored(self):
+        self.assertEqual(seasons_missing([1], [None, "x", 1]), [])
 
 
 if __name__ == "__main__":
