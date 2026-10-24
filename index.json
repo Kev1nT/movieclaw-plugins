@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generated_at": "2026-10-24T08:55:29Z",
+  "generated_at": "2026-10-24T08:56:27Z",
   "signed": true,
   "key_id": "catalog-1",
   "repository": "https://github.com/movieclaw/movieclaw-plugins",
@@ -492,9 +492,54 @@
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=platform-discovery",
       "downloads": 6,
-      "latest": "0.11.0",
-      "latest_stable": "0.11.0",
+      "latest": "0.11.1",
+      "latest_stable": "0.11.1",
       "versions": [
+        {
+          "version": "0.11.1",
+          "prerelease": false,
+          "released_at": "2026-10-24T08:56:27Z",
+          "yanked": null,
+          "notes": "以「岛屿、放映光束、海平线」重新设计映屿图标，提供导航单色版与商店彩色版；独立页面品牌标识与浏览器页签图标同步更新。保持单入口、权限、账号偏好与服务行为不变。\n",
+          "changelog_url": "https://github.com/movieclaw/movieclaw-plugins/releases/tag/platform-discovery-v0.11.1",
+          "source_url": "https://github.com/movieclaw/movieclaw-plugins/tree/platform-discovery-v0.11.1/plugins/platform-discovery",
+          "readme": {
+            "url": "https://raw.githubusercontent.com/movieclaw/movieclaw-plugins/platform-discovery-v0.11.1/plugins/platform-discovery/README.md",
+            "sha256": "362fe6b215f747812bdb0a9c657e92e67e02f0a33e36d5de76228d870f4891e9",
+            "size": 12538
+          },
+          "runtime": "inline",
+          "sdk": "^1.0",
+          "requires": {
+            "host-ops": "^1.0",
+            "plugin-routes": "^1.0",
+            "plugin-data": "^1.0"
+          },
+          "platforms": [
+            "any"
+          ],
+          "permissions": {
+            "operations": [
+              "discover.get-title-details",
+              "discover.filter-titles"
+            ],
+            "paths": [],
+            "network": true,
+            "callbacks": [],
+            "events": []
+          },
+          "web": true,
+          "dependencies": null,
+          "artifacts": [
+            {
+              "platform": "any",
+              "filename": "platform-discovery-0.11.1.mcplugin",
+              "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/platform-discovery-v0.11.1/platform-discovery-0.11.1.mcplugin",
+              "sha256": "758fc1814561ff4ae7f49ad8632f264020656861489614a0931fd8a60c1c06f0",
+              "size": 355266
+            }
+          ]
+        },
         {
           "version": "0.11.0",
           "prerelease": false,
