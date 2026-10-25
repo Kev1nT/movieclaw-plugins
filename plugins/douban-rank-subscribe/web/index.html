@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>豆瓣榜单</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="theme.css">
+<style>
+  /* 只写这一页特有的东西；版式一律走 theme.css，不要在这里重定义 */
+  /* 卡片左上角的年份小标签（评分角标已在 theme.css 里） */
+  .card .poster .year {
+    position: absolute; left: 6px; top: 6px; z-index: 2;
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 20px; padding: 0 6px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; line-height: 1;
+    background: rgba(0,0,0,.72); color: #fff;
+  }
+
+  /* 片名是可点的详情入口：给一点可点提示，但不破坏 theme.css 的字号/行高 */
+  .card .name[data-detail] { cursor: pointer; }
+  .card .name[data-detail]:hover { color: var(--mc-accent, #e50914); }
+  .card .name[data-detail]:focus-visible {
+    outline: 2px solid var(--mc-accent, #e50914); outline-offset: 2px; border-radius: 3px;
+  }
+
+  /* ---------- 详情弹窗的内容（版式外壳由 theme.css 提供） ---------- */
+  .d-hero { margin: 0 -20px 14px; height: 180px; overflow: hidden; border-radius: 10px;
+    background: color-mix(in srgb, var(--mc-text, #fff) 8%, transparent); }
+  .d-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .d-lead { padding-bottom: 4px; }
+  .d-title { margin: 0 0 8px; font-size: 20px; font-weight: 700; line-height: 1.3;
+    overflow-wrap: anywhere; }
+  .d-meta { margin: 0 0 4px; font-size: 12.5px; line-height: 1.7;
+    color: color-mix(in srgb, var(--mc-text, #fff) 78%, transparent); }
+  .d-score { color: var(--mc-warn, #e87c03); font-weight: 700; }
+  .d-hint { margin: 2px 0 0; font-size: 11.5px; line-height: 1.6;
+    color: var(--mc-text-muted, #9a9a9a); }
+  .d-ov { margin: 10px 0 0; font-size: 12.5px; line-height: 1.7;
+    color: color-mix(in srgb, var(--mc-text, #fff) 82%, transparent);
+    overflow-wrap: anywhere; }
+  .d-section { margin-top: 16px; }
+  .d-section h4 { margin: 0 0 8px; font-size: 11px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--mc-text-muted, #8e8e8e); }
+  /* 演职员：竖版小卡 */
+  .d-cast { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px;
+    scrollbar-width: none; }
+  .d-cast::-webkit-scrollbar { display: none; }
+  .d-cast figure { margin: 0; flex: 0 0 auto; width: 72px; text-align: center; }
+  .d-cast .av { width: 72px; aspect-ratio: 2/3; border-radius: 8px; overflow: hidden;
+    background: color-mix(in srgb, var(--mc-text, #fff) 8%, transparent); }
+  .d-cast .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .d-cast figcaption { margin-top: 6px; font-size: 11.5px; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .d-cast figcaption small { display: block; font-size: 11px; line-height: 1.4;
+    color: var(--mc-text-muted, #999); overflow: hidden; text-overflow: ellipsis; }
+  /* 相似推荐 */
+  .d-rec { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
+  .d-rec-item { padding: 0; border: 0; background: none; cursor: pointer; text-align: left;
+    color: inherit; font: inherit; }
+  .d-rec-item img { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 6px;
+    display: block; background: color-mix(in srgb, var(--mc-text, #fff) 8%, transparent); }
+  .d-rec-item span { display: block; margin-top: 4px; font-size: 11.5px; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 720px) {
+    .d-hero { margin: 0 -16px 12px; height: 140px; }
+  }
+</style>
+<script>
+/* 右对齐基准：手机（≤767px）量主程序顶栏「搜索按钮」的边框右缘，正文右缘对齐它。
+   必须赶在正文渲染之前算好，否则会「先画好再往左跳一下」。 */
+(function () {
+  function measure() {
+    try {
+      const pdoc = window.parent && window.parent !== window ? window.parent.document : null;
+      if (!pdoc) return false;
+      const total = pdoc.documentElement.clientWidth || 0;
+      if (!total || total > 767) return false;
+      const avatar = (function () {
+        let best = null;
+        pdoc.querySelectorAll("header img, header [class*='rounded-full']").forEach(function (el) {
+          if (el.querySelector("svg")) return;
+          const r = el.getBoundingClientRect();
+          if (r.width < 24 || r.width > 64 || Math.abs(r.width - r.height) > 5) return;
+          if (r.top < -12 || r.top > 130) return;
+          if (!best || r.right > best.right) best = r;
+        });
+        return best;
+      })();
+      let box = null;
+      pdoc.querySelectorAll("header svg").forEach(function (svg) {
+        const el = svg.closest("button, a, [role='button']") || svg;
+        const r = el.getBoundingClientRect();
+        if (!r.width || r.top < -12 || r.top > 130) return;
+        if (avatar && r.right > avatar.left + 1) return;
+        if (!box || r.right > box.right) box = r;
+      });
+      if (!box) return false;
+      const frame = window.frameElement ? window.frameElement.getBoundingClientRect() : null;
+      const refRight = frame && frame.width > 0 ? frame.right : total;
+      const gap = refRight - box.right;
+      if (gap < 0 || gap > total * 0.4) return false;
+      document.documentElement.style.setProperty("--content-right", Math.round(gap) + "px");
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+  window.__mcalignChrome = measure;
+  measure();
+})();
+</script>
+</head>
+<body>
+
+<!-- ① 顶栏 -->
+<div class="topbar">
+  <div class="brand">DOUBAN</div>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="btn-refresh" title="刷新榜单" aria-label="刷新榜单">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+  </button>
+  <button class="icon-btn" id="btn-settings" title="设置" aria-label="设置">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10.6 3V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</div>
+
+<!-- ② 分段标签：按榜单类型分 -->
+<div class="tabs" id="tabs">
+  <button class="tab on" data-tab="movie">电影 <span class="n" id="n-movie">–</span></button>
+  <button class="tab" data-tab="tv">剧集 <span class="n" id="n-tv">–</span></button>
+  <span class="tab-hint" id="tab-hint"></span>
+</div>
+
+<!-- ③ 内容 -->
+<main><div id="board"></div></main>
+
+<!-- ④ 设置抽屉 -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header>
+    <h2>豆瓣榜单设置</h2>
+    <button class="icon-btn" id="btn-close" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </header>
+  <div class="body" id="settings-body"></div>
+  <footer>
+    <span class="status-msg" id="settings-msg"></span>
+    <div class="acts">
+      <button class="cancel" id="btn-cancel">取消</button>
+      <button class="save" id="btn-save">保存</button>
+    </div>
+  </footer>
+</aside>
+
+<!-- ⑤ 选项弹窗（长在设置抽屉位置上） -->
+<div class="picker-scrim" id="picker-scrim"></div>
+<div class="picker" id="picker">
+  <div class="box">
+    <header>
+      <h3 id="picker-title">选择</h3>
+      <button class="icon-btn" id="picker-close" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="body" id="picker-body"></div>
+    <footer>
+      <button class="btn-plain" id="picker-cancel">取消</button>
+      <button class="done" id="picker-done">完成</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ⑥ 确认弹窗 -->
+<div class="confirm" id="confirm">
+  <div class="box">
+    <h3 id="confirm-title">确认？</h3>
+    <p id="confirm-text"></p>
+    <p id="confirm-note" class="fine"></p>
+    <div class="acts">
+      <button class="btn-plain" id="confirm-cancel">再想想</button>
+      <button class="btn-plain accent" id="confirm-ok">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⑦ 详情弹窗（居中，看一部片子的资料） -->
+<div class="detail-scrim" id="detail-scrim"></div>
+<div class="detail-modal" id="detail-modal" aria-hidden="true">
+  <header>
+    <h2 id="detail-title">详情</h2>
+    <button class="icon-btn" id="detail-close" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </header>
+  <div class="body" id="detail-body"></div>
+  <footer id="detail-footer"></footer>
+</div>
+
+<div id="toast" style="opacity:0"></div>
+
+<script src="theme-ui.js"></script>
+<div data-reload="ready" hidden></div>
+<script src="theme-reload.js"></script>
+<script src="logic.js"></script>
+<script>
+(function () {
+  const { $, $$, esc, api, post, toast, confirm } = MCUI;
+  // logic.js 把纯函数挂在 window.RankLogic 上，这里取出来给下面用
+  const L = window.RankLogic || {};
+  const BASE = "/api/v1/plugins/douban-rank-subscribe";
+
+  let panelCfg = null;      // 后端设置（榜单勾选等）
+  let draft = null;         // 抽屉里的草稿
+  let tab = "movie";        // 当前分类
+  let subs = [];            // 订阅列表（判断是否已订阅）
+  const dataCache = new Map();   // collection_ref -> 条目列表
+  let pickerRollback = null;     // 榜单多选弹窗的取消回滚
+
+  /* ================= 数据 ================= */
+  async function loadPanel() {
+    const d = await api(BASE + "/panel");
+    panelCfg = (d && d.settings) || {};
+    return panelCfg;
+  }
+  async function loadSubs() {
+    try { subs = (await api("/api/v1/subscriptions")) || []; }
+    catch (e) { subs = []; }
+  }
+  // 已入库条目在列表接口里只有 media_item_id，没有 library_id；
+  // 媒体库条目页要 /library/{library_id}/item/{media_item_id}，
+  // 所以对已入库的那些补取一次详情（详情带 library_links）。
+  const libHrefCache = new Map();   // title_ref -> 媒体库条目页地址
+  const libDetailPending = new Map();
+
+  async function fillLibraryHrefs(list) {
+    const need = list.filter(function (t) {
+      const owned = t.library_status && t.library_status.file_count > 0;
+      return owned && !libHrefCache.has(t.title_ref) && !libDetailPending.has(t.title_ref);
+    });
+    // 并发上限 4，避免一次把接口打满
+    const queue = need.slice();
+    async function worker() {
+      while (queue.length) {
+        const t = queue.shift();
+        const p = api("/api/v1/discover/titles/" + encodeURIComponent(t.title_ref))
+          .then(function (d) { libHrefCache.set(t.title_ref, L.libraryHref(d) || ""); })
+          .catch(function () { libHrefCache.set(t.title_ref, ""); })
+          .finally(function () { libDetailPending.delete(t.title_ref); });
+        libDetailPending.set(t.title_ref, p);
+        await p;
+      }
+    }
+    await Promise.all([worker(), worker(), worker(), worker()]);
+  }
+
+  async function loadRank(ref, limit) {
+    if (dataCache.has(ref)) return dataCache.get(ref);
+    const d = await api("/api/v1/discover/collections/" + encodeURIComponent(ref) +
+      "/titles?limit=" + (limit || 30));
+    const list = (d && d.titles) || [];
+    await fillLibraryHrefs(list);
+    dataCache.set(ref, list);
+    return list;
+  }
+
+  /* ================= 卡片 ================= */
+  function subOf(ref) { return L.findSubscription(subs, ref); }
+
+  function cardHtml(t, ref) {
+    const poster = L.posterOf(t) || "";
+    const rating = L.ratingText(t.provider_rating);
+    const owned = t.library_status && t.library_status.file_count > 0;
+    const sub = subOf(t.title_ref);
+    const canAct = !owned && !sub;
+    // 卡片状态决定浮层露出哪颗按钮（theme.css 已写好规则）
+    const attr = owned ? ' data-library="1"' : (sub ? ' data-sub="1"' : '');
+    return (
+      '<article class="card" data-ref="' + esc(t.title_ref) + '" data-kind="' + esc(t.media_type || "") + '"' +
+      attr + ' tabindex="0">' +
+      '<div class="poster">' +
+      '<span class="ph">' + esc((t.title || "?").slice(0, 2)) + "</span>" +
+      (poster ? '<img loading="lazy" src="' + esc(poster) + '" alt="' + esc(t.title) + '"' +
+        ' onerror="this.style.display=\'none\'">' : "") +
+      (rating ? '<span class="badge"><span class="star">★</span>' + esc(rating) + "</span>" : "") +
+      (t.release_year ? '<span class="year">' + esc(t.release_year) + "</span>" : "") +
+      // 浮层：三颗按钮都由 CSS 按状态显示，页面只管状态
+      '<div class="act">' +
+      (canAct ? '<button type="button" class="act-btn consent" data-act="sub">订阅</button>' : "") +
+      (sub ? '<a class="act-btn to-sub" target="_top" href="' + esc(L.subscriptionHref(sub)) + '">前往订阅</a>' : "") +
+      // 已入库：跳这部片在媒体库里的条目页（地址已由 fillLibraryHrefs 补好）
+      (owned ? '<a class="act-btn to-lib" target="_top" href="' +
+        esc(libHrefCache.get(t.title_ref) || "/library") + '">前往媒体库</a>' : "") +
+      "</div>" +
+      "</div>" +
+      '<div class="name" title="' + esc(t.title) + '" role="button" tabindex="0"' +
+      ' data-detail="' + esc(t.title_ref) + '">' + esc(t.title || "未知") + "</div>" +
+      '<div class="sub">' + esc(t.release_year || "") + "</div>" +
+      "</article>"
+    );
+  }
+
+  function rowsHtml(list, ref) {
+    const limit = panelCfg.per_rank_limit || 30;
+    const minRating = panelCfg.min_rating || 0;
+    return list.map(function (group) {
+      const titles = L.filterTitles(group.titles, minRating).slice(0, limit);
+      if (!titles.length) return "";
+      return (
+        '<section class="row">' +
+        '<div class="row-head"><h2 class="row-title">' + esc(group.name) + "</h2>" +
+        '<span class="row-count">' + titles.length + " 部</span></div>" +
+        '<div class="grid">' + titles.map(function (t) { return cardHtml(t, group.ref); }).join("") + "</div>" +
+        "</section>"
+      );
+    }).join("");
+  }
+
+  function skeleton() {
+    return (
+      '<section class="row"><div class="row-head"><h2 class="row-title">正在读取榜单…</h2></div>' +
+      '<div class="grid">' + Array(12).fill('<div class="skeleton"></div>').join("") + "</div></section>"
+    );
+  }
+
+  function notice(title, text, actionId) {
+    return '<div class="notice"><strong>' + esc(title) + "</strong>" + text +
+      (actionId ? '<button id="' + actionId + '">去设置</button>' : "") + "</div>";
+  }
+
+  /* 当前分类下勾选的榜单 */
+  function ranksOfKind(kind) {
+    const picked = L.enabledRanks(panelCfg, kind);
+    return picked;
+  }
+
+  /* ================= 渲染 ================= */
+  async function render() {
+    const boardEl = $("#board");
+    const ranks = ranksOfKind(tab);
+    if (!ranks.length) {
+      boardEl.innerHTML = notice(
+        "还没有选择" + (tab === "movie" ? "电影" : "剧集") + "榜单",
+        "点右上角设置，勾上想看的豆瓣榜单，这里就会按榜单列出海报。",
+        "btn-go-settings"
+      );
+      const b = $("#btn-go-settings");
+      if (b) b.addEventListener("click", openSettings);
+      return;
+    }
+    boardEl.innerHTML = ranks.map(function (r) {
+      return '<section class="row"><div class="row-head"><h2 class="row-title">' + esc(r.title) + "</h2></div>" +
+        '<div class="grid">' + Array(6).fill('<div class="skeleton"></div>').join("") + "</div></section>";
+    }).join("");
+
+    const groups = [];
+    for (let i = 0; i < ranks.length; i++) {
+      try {
+        const titles = await loadRank(ranks[i].ref, panelCfg.per_rank_limit || 30);
+        groups.push({ ref: ranks[i].ref, name: ranks[i].title, titles: titles });
+      } catch (e) {
+        groups.push({ ref: ranks[i].ref, name: ranks[i].title, titles: [], error: e.message });
+      }
+    }
+    boardEl.innerHTML = rowsHtml(groups) ||
+      notice("这个门槛下没有条目", "榜单读取成功，但按当前评分门槛筛完是空的，可以在设置里调低门槛。");
+    $("#tab-hint").textContent = ranks.map(function (r) { return r.title; }).join(" · ");
+  }
+
+  function updateTabCounts() {
+    const mv = L.enabledRanks(panelCfg, "movie").length;
+    const tv = L.enabledRanks(panelCfg, "tv").length;
+    $("#n-movie").textContent = mv;
+    $("#n-tv").textContent = tv;
+  }
+
+  /* ================= 设置抽屉 ================= */
+  function openSettings() {
+    MCUI.openDrawer(function () { renderSettings(); });
+  }
+
+  function ranksSummary(kind) {
+    const picked = L.enabledRanks(draft, kind);
+    if (!picked.length) return "未选择";
+    if (picked.length <= 2) return picked.map(function (r) { return r.title; }).join("、");
+    return picked.slice(0, 2).map(function (r) { return r.title; }).join("、") + " 等 " + picked.length + " 个";
+  }
+
+  function tvLabel(v) {
+    return (v === "pending") ? "记入待确认" : "只追新集";
+  }
+
+  function renderSettings() {
+    draft = Object.assign({}, panelCfg);
+    const body = $("#settings-body");
+    body.innerHTML =
+      '<div class="set-group">监控的榜单</div>' +
+      '<div class="set-list">' +
+      '<button type="button" class="set-row" id="row-movie">' +
+      '<span class="label">电影榜单<small>一周口碑、实时热门、Top250 等</small></span>' +
+      '<span class="value" id="val-movie">' + esc(ranksSummary("movie")) + "</span>" +
+      '<span class="chev">' + CHEV + "</span></button>" +
+      '<button type="button" class="set-row" id="row-tv">' +
+      '<span class="label">剧集与综艺<small>口碑剧集榜、热门美剧日剧韩剧等</small></span>' +
+      '<span class="value" id="val-tv">' + esc(ranksSummary("tv")) + "</span>" +
+      '<span class="chev">' + CHEV + "</span></button>" +
+      "</div>" +
+
+      '<div class="set-group">订阅条件</div>' +
+      '<div class="set-list">' +
+      '<label class="set-row"><span class="label">评分门槛<small>低于这个分数的不订阅，填 0 不限</small></span>' +
+      '<input type="number" class="inline-num" id="f-min" min="0" max="10" step="0.1" value="' +
+      esc(draft.min_rating != null ? draft.min_rating : 7) + '"></label>' +
+      '<label class="set-row"><span class="label">每个榜单取前<small>只处理靠前的若干条</small></span>' +
+      '<input type="number" class="inline-num" id="f-limit" min="1" max="500" value="' +
+      esc(draft.per_rank_limit || 30) + '"></label>' +
+      '<button type="button" class="set-row" id="row-tv-mode">' +
+      '<span class="label">剧集怎么订<small>豆瓣剧集对不上季时怎么办</small></span>' +
+      '<span class="value" id="val-tv-mode">' + esc(tvLabel(draft.tv_strategy)) + "</span>" +
+      '<span class="chev">' + CHEV + "</span></button>" +
+      "</div>" +
+
+      '<div class="set-group">自定义榜单</div>' +
+      '<div class="set-list">' +
+      '<div class="set-block"><label>榜单地址</label>' +
+      '<textarea id="f-feeds" placeholder="每行一个地址，如 https://rsshub.app/douban/movie/ustop">' +
+      esc(draft.custom_feeds || "") + "</textarea>" +
+      '<div class="hint">支持 RSS/Atom、JSON 列表、纯文本一行一个片名；# 开头的行忽略。</div></div>' +
+      "</div>";
+
+    $("#row-movie").addEventListener("click", function () { pickRanks("movie"); });
+    $("#row-tv").addEventListener("click", function () { pickRanks("tv"); });
+    $("#row-tv-mode").addEventListener("click", function () {
+      MCUI.singlePicker("剧集怎么订", [
+        { value: "follow_new", title: "只追新集", desc: "只追以后播出的新剧集，不猜季号" },
+        { value: "pending", title: "记入待确认", desc: "不自动订剧集，记进待确认等你勾季" },
+      ], draft.tv_strategy || "follow_new", function (v) {
+        draft.tv_strategy = v;
+        $("#val-tv-mode").textContent = tvLabel(v);
+      });
+    });
+    $("#settings-msg").textContent = "";
+    $("#settings-msg").className = "status-msg";
+  }
+
+  /* 榜单多选：在 picker 里勾，点「完成」回写 */
+  function pickRanks(kind) {
+    // 取消要能丢弃：先把当前勾选存一份，点「取消」时还原
+    const snapshot = {};
+    L.RANKS.forEach(function (r) { snapshot["rank_" + r.field] = draft["rank_" + r.field] === true; });
+    pickerRollback = function () {
+      Object.keys(snapshot).forEach(function (k) { draft[k] = snapshot[k]; });
+      const val = $("#val-" + kind);
+      if (val) val.textContent = ranksSummary(kind);
+    };
+    const items = L.RANKS.filter(function (r) { return r.kind === kind; });
+    const html = items.map(function (r) {
+      const on = draft["rank_" + r.field] === true;
+      return '<label class="set-row"><span class="label">' + esc(r.title) + "</span>" +
+        '<span class="switch"><input type="checkbox" data-field="rank_' + esc(r.field) + '"' +
+        (on ? " checked" : "") + '><span class="knob"></span></span></label>';
+    }).join("");
+    MCUI.openPicker("选择" + (kind === "movie" ? "电影" : "剧集或综艺") + "榜单", html, "完成");
+    MCUI.$$("#picker-body input[data-field]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        draft[el.dataset.field] = el.checked;
+        const val = $("#val-" + kind);
+        if (val) val.textContent = ranksSummary(kind);
+      });
+    });
+  }
+
+  async function saveSettings() {
+    const msg = $("#settings-msg");
+    const payload = Object.assign({}, draft);
+    payload.min_rating = Number($("#f-min").value);
+    payload.per_rank_limit = Number($("#f-limit").value);
+    payload.custom_feeds = $("#f-feeds") ? $("#f-feeds").value : (draft.custom_feeds || "");
+    payload.tv_strategy = draft.tv_strategy || "follow_new";
+    if (!(payload.min_rating >= 0 && payload.min_rating <= 10)) {
+      msg.textContent = "评分门槛要在 0 到 10 之间"; msg.className = "status-msg err"; return;
+    }
+    if (!(payload.per_rank_limit >= 1 && payload.per_rank_limit <= 500)) {
+      msg.textContent = "每个榜单条数要在 1 到 500 之间"; msg.className = "status-msg err"; return;
+    }
+    msg.textContent = "保存中…"; msg.className = "status-msg";
+    try {
+      const d = await post(BASE + "/panel", payload, "PUT");
+      panelCfg = (d && d.settings) || payload;
+      dataCache.clear();
+      libHrefCache.clear();
+      msg.textContent = "已保存"; msg.className = "status-msg ok";
+      updateTabCounts();
+      setTimeout(function () { MCUI.closeDrawer(); render(); }, 500);
+    } catch (err) {
+      msg.textContent = err.message || "保存失败"; msg.className = "status-msg err";
+    }
+  }
+
+  const CHEV = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+
+  /* ================= 详情弹窗 ================= */
+  function findTitle(ref) {
+    for (const list of dataCache.values()) {
+      const hit = list.find(function (t) { return t.title_ref === ref; });
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  async function openTitle(ref) {
+    const t = findTitle(ref) || { title_ref: ref };
+    const title = t.title || "详情";
+    MCUI.openDetail({ title: title, html: '<p class="d-hint">正在读取详情…</p>', footer: "" });
+    try {
+      const d = await api("/api/v1/discover/titles/" + encodeURIComponent(ref));
+      MCUI.openDetail({
+        title: d.title.title || title,
+        html: detailHtml(d),
+        footer: detailFooter(d),
+        onOpen: bindDetail,
+      });
+    } catch (e) {
+      MCUI.openDetail({
+        title: title,
+        html: '<p class="d-hint">打不开这部片子的详情：' + esc(e.message) + "</p>",
+        footer: '<button class="btn-plain" id="d-close">关闭</button>',
+        onOpen: function () { const b = $("#d-close"); if (b) b.addEventListener("click", MCUI.closeDetail); },
+      });
+    }
+  }
+
+  function detailHtml(d) {
+    const t = d.title || {};
+    const m = d.metadata || {};
+    const rating = L.ratingText(t.provider_rating);
+    const meta = L.metaLine(d);
+    const place = L.countryGenreLine(d);
+    const released = L.releaseLine(d);
+    const cast = L.castList(d, 16);
+    const hero = L.heroVisual(d);
+    const recs = (d.recommendations || []).slice(0, 12);
+    return (
+      (hero.url ? '<div class="d-hero"><img src="' + esc(hero.url) + '" alt=""></div>' : "") +
+      '<div class="d-lead">' +
+      '<h3 class="d-title">' + esc(t.title || "") + "</h3>" +
+      (rating ? '<p class="d-meta"><span class="d-score">★ ' + esc(rating) + "</span>" +
+        (meta ? " · " + esc(meta) : "") + "</p>" : (meta ? '<p class="d-meta">' + esc(meta) + "</p>" : "")) +
+      (place.place || place.genres
+        ? '<p class="d-meta">' + esc(place.place) +
+          (place.place && place.genres ? " ｜ " : "") + esc(place.genres) + "</p>" : "") +
+      (released ? '<p class="d-hint">' + esc(released) + "</p>" : "") +
+      (t.overview ? '<p class="d-ov">' + esc(t.overview) + "</p>" : "") +
+      "</div>" +
+      (cast.length
+        ? '<div class="d-section"><h4>演职员</h4>' +
+          '<div class="d-cast">' + cast.map(function (p) {
+            return '<figure><div class="av">' +
+              (p.avatar ? '<img loading="lazy" src="' + esc(L.plainImage(p.avatar)) + '" alt="" onerror="this.remove()">' : "") +
+              "</div><figcaption>" + esc(p.name) +
+              (p.credit ? '<small>' + esc(p.credit) + "</small>" : "") + "</figcaption></figure>";
+          }).join("") + "</div></div>"
+        : "") +
+      (recs.length
+        ? '<div class="d-section"><h4>相似推荐</h4><div class="d-rec">' +
+          recs.map(function (r) {
+            return '<button type="button" class="d-rec-item" data-open="' + esc(r.title_ref) + '">' +
+              '<img loading="lazy" src="' + esc(L.posterOf(r)) + '" alt="" onerror="this.style.display=\'none\'">' +
+              '<span>' + esc(r.title) + "</span></button>";
+          }).join("") + "</div></div>"
+        : "")
+    );
+  }
+
+  function detailFooter(d) {
+    const t = d.title || {};
+    const owned = t.library_status && t.library_status.file_count > 0;
+    const sub = subOf(t.title_ref);
+    const libHref = L.libraryHref(d);
+    let out = '<button class="btn-plain" id="d-close">关闭</button>';
+    if (owned && libHref) {
+      out += '<a class="btn-plain accent" target="_top" href="' + esc(libHref) + '">' +
+        esc(L.libraryLabel(d)) + "</a>";
+    } else if (sub) {
+      out += '<a class="btn-plain accent" target="_top" href="' + esc(L.subscriptionHref(sub)) + '">前往订阅</a>';
+    } else if (String(t.title_ref || "").startsWith("douban:")) {
+      out = '<button class="btn-plain" id="d-close">关闭</button>' +
+        '<button class="btn-plain accent" id="d-sub">订阅</button>';
+    }
+    return out;
+  }
+
+  function bindDetail(modal, bodyEl) {
+    const close = $("#d-close");
+    if (close) close.addEventListener("click", MCUI.closeDetail);
+    const subBtn = $("#d-sub");
+    if (subBtn) {
+      subBtn.addEventListener("click", async function () {
+        const ref = modal.dataset.ref;
+        subBtn.disabled = true; subBtn.textContent = "订阅中…";
+        try {
+          await post(BASE + "/subscribe", { title_ref: ref }, "POST");
+          toast("已订阅");
+          MCUI.closeDetail();
+          dataCache.clear();
+          libHrefCache.clear();
+          await loadSubs();
+          render();
+        } catch (e) {
+          toast(e.message || "订阅失败");
+          subBtn.disabled = false; subBtn.textContent = "订阅";
+        }
+      });
+    }
+    MCUI.$$(".d-rec-item", bodyEl).forEach(function (b) {
+      b.addEventListener("click", function () { openTitle(b.dataset.open); });
+    });
+  }
+
+  /* ================= 启动 ================= */
+  (async function boot() {
+    const boardEl = $("#board");
+    boardEl.innerHTML = skeleton();
+    try {
+      await Promise.all([loadPanel(), loadSubs()]);
+    } catch (err) {
+      boardEl.innerHTML = err.status === 403
+        ? notice("需要管理员权限", "这个页面要读取插件设置，请用管理员账号打开。")
+        : notice("读取失败", esc(err.message) + ' <button onclick="location.reload()">重试</button>');
+      return;
+    }
+
+    updateTabCounts();
+    MCUI.bindTabs("#tabs");
+    await render();
+
+    // 卡片：点海报 → 正中浮出胶囊；点浮层按钮执行动作
+    MCUI.bindCards(boardEl, async function (act, btn, card) {
+      if (act === "sub") {
+        btn.disabled = true; btn.textContent = "订阅中…";
+        try {
+          await post(BASE + "/subscribe", { title_ref: card.dataset.ref }, "POST");
+          toast("已订阅");
+          MCUI.closeCards();
+          dataCache.clear();
+          libHrefCache.clear();
+          await loadSubs();
+          render();
+        } catch (e) {
+          toast(e.message || "订阅失败");
+          btn.disabled = false; btn.textContent = "订阅";
+        }
+      }
+    });
+
+    // 片名区域 = 看详情入口（海报留给动作：点开出浮层按钮）
+    boardEl.addEventListener("click", function (e) {
+      const nameEl = e.target.closest("[data-detail]");
+      if (!nameEl) return;
+      e.preventDefault();
+      e.stopPropagation();
+      MCUI.closeCards();
+      openTitle(nameEl.dataset.detail);
+    });
+    boardEl.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const nameEl = e.target.closest("[data-detail]");
+      if (!nameEl) return;
+      e.preventDefault();
+      openTitle(nameEl.dataset.detail);
+    });
+
+    // 设置
+    $("#btn-settings").addEventListener("click", openSettings);
+    $("#btn-close").addEventListener("click", MCUI.closeDrawer);
+    $("#btn-cancel").addEventListener("click", MCUI.closeDrawer);
+    $("#scrim").addEventListener("click", MCUI.closeDrawer);
+    $("#btn-save").addEventListener("click", saveSettings);
+    // 取消 / 关闭 / 点遮罩：丢弃本次选择；「完成」才保留
+    function pickerCancel() {
+      if (pickerRollback) { pickerRollback(); pickerRollback = null; }
+      MCUI.closePicker(false);
+    }
+    $("#picker-close").addEventListener("click", pickerCancel);
+    $("#picker-cancel").addEventListener("click", pickerCancel);
+    $("#picker-scrim").addEventListener("click", pickerCancel);
+    $("#picker-done").addEventListener("click", function () {
+      pickerRollback = null;
+      MCUI.closePicker(true);
+    });
+    $("#detail-close").addEventListener("click", MCUI.closeDetail);
+    $("#detail-scrim").addEventListener("click", MCUI.closeDetail);
+
+    // 刷新
+    $("#btn-refresh").addEventListener("click", async function () {
+      dataCache.clear();
+      libHrefCache.clear();
+      boardEl.innerHTML = skeleton();
+      await Promise.all([loadPanel(), loadSubs()]);
+      updateTabCounts();
+      await render();
+      toast("已刷新");
+    });
+
+    // 分段切换
+    MCUI.$$(".tab").forEach(function (el) {
+      el.addEventListener("click", function () {
+        if (el.dataset.tab === tab) return;
+        tab = el.dataset.tab;
+        MCUI.$$(".tab").forEach(function (t) { t.classList.toggle("on", t === el); });
+        MCUI.revealActiveTab("#tabs", true);
+        render();
+      });
+    });
+  })();
+})();
+</script>
+</body>
+</html>

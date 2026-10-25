@@ -1,0 +1,9 @@
+{
+  "author": "asu",
+  "license": "见仓库许可证",
+  "origin": "official",
+  "summary": "浏览豆瓣热门/口碑榜单并一键订阅，后台按榜单定期扫描自动追更",
+  "category": "tools",
+  "icon": "icon.svg",
+  "screenshots": []
+}

@@ -1,0 +1,19 @@
+[plugin]
+id = "douban-rank-subscribe"
+title = "豆瓣榜单订阅"
+version = "1.0.0"
+entry = "douban_rank_subscribe"
+runtime = "process"
+sdk = "^1.0"
+description = "在左侧栏「豆瓣榜单」里浏览豆瓣热门/口碑榜单：海报墙点开可看详情、一键订阅；后台按你勾选的榜单定期扫描，新上榜且评分达标的作品自动创建订阅。也支持自定义榜单地址（RSS/JSON/纯文本）。"
+
+[requires]
+"scheduled-tasks" = "^1.0"
+
+[permissions]
+operations = [
+    "discover.browse-collection",
+    "search.titles",
+    "subscriptions.create",
+]
+network = true

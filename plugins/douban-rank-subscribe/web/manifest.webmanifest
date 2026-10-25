@@ -1,0 +1,6 @@
+{
+  "name": "豆瓣榜单",
+  "short_name": "豆瓣榜单",
+  "start_url": ".",
+  "icons": [{ "src": "icon.svg", "type": "image/svg+xml", "purpose": "monochrome" }]
+}
