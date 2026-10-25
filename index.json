@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generated_at": "2026-10-25T10:47:51Z",
+  "generated_at": "2026-10-25T10:49:57Z",
   "signed": true,
   "key_id": "catalog-1",
   "repository": "https://github.com/movieclaw/movieclaw-plugins",
@@ -234,6 +234,74 @@
               "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/cloud-115-v0.1.0-beta.1/cloud-115-0.1.0-beta.1.mcplugin",
               "sha256": "88958b608374e8481f389bb11d113419db7e42588d81958d8cfead10e9eda5bb",
               "size": 45196
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "douban-rank-subscribe",
+      "name": "豆瓣榜单订阅",
+      "summary": "浏览豆瓣热门/口碑榜单并一键订阅，后台按榜单定期扫描自动追更",
+      "description": "在左侧栏「豆瓣榜单」里浏览豆瓣热门/口碑榜单：海报墙点开可看详情、一键订阅；后台按你勾选的榜单定期扫描，新上榜且评分达标的作品自动创建订阅。也支持自定义榜单地址（RSS/JSON/纯文本）。",
+      "category": "tools",
+      "author": {
+        "name": "asu",
+        "url": null
+      },
+      "homepage": "https://github.com/movieclaw/movieclaw-plugins/tree/main/plugins/douban-rank-subscribe",
+      "repository": "https://github.com/movieclaw/movieclaw-plugins/tree/main/plugins/douban-rank-subscribe",
+      "license": "见仓库许可证",
+      "origin": "official",
+      "icon": {
+        "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/catalog/douban-rank-subscribe-icon-9084593c4179730a.svg",
+        "sha256": "9084593c4179730a90827dc4eaa02ec9cb4a8fecfc1d2876b729d5cf5bac1e70",
+        "size": 238
+      },
+      "screenshots": [],
+      "deprecated": null,
+      "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=douban-rank-subscribe",
+      "downloads": 0,
+      "latest": "1.0.0",
+      "latest_stable": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "prerelease": false,
+          "released_at": "2026-10-25T10:49:57Z",
+          "yanked": null,
+          "notes": "- 在左侧栏「豆瓣榜单」里浏览豆瓣热门/口碑榜单：海报墙点开可看详情、一键订阅。\n- 后台按你勾选的榜单定期扫描，新上榜且评分达标的作品自动创建订阅。\n- 支持自定义榜单地址（RSS/Atom、JSON、纯文本一行一个片名）。\n- 详情弹窗含海报、评分、地区类型、上映日期、简介、演职员与相似推荐。\n- 设置集中到右上角抽屉：榜单勾选、评分门槛、每榜条数、剧集订阅策略、自定义地址。\n- 界面按 MovieClaw 插件页统一版式：顶栏、分段标签、海报网格、抽屉、选项弹窗、详情弹窗。\n- 剧集默认只追以后播出的新集，可选改为记入待确认。\n",
+          "changelog_url": "https://github.com/movieclaw/movieclaw-plugins/releases/tag/douban-rank-subscribe-v1.0.0",
+          "source_url": "https://github.com/movieclaw/movieclaw-plugins/tree/douban-rank-subscribe-v1.0.0/plugins/douban-rank-subscribe",
+          "readme": null,
+          "runtime": "process",
+          "sdk": "^1.0",
+          "requires": {
+            "scheduled-tasks": "^1.0"
+          },
+          "platforms": [
+            "any"
+          ],
+          "permissions": {
+            "operations": [
+              "discover.browse-collection",
+              "search.titles",
+              "subscriptions.create"
+            ],
+            "paths": [],
+            "network": true,
+            "callbacks": [],
+            "events": []
+          },
+          "web": true,
+          "dependencies": null,
+          "artifacts": [
+            {
+              "platform": "any",
+              "filename": "douban-rank-subscribe-1.0.0.mcplugin",
+              "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/douban-rank-subscribe-v1.0.0/douban-rank-subscribe-1.0.0.mcplugin",
+              "sha256": "9857399e111a0f093e50fcaf10adf81d9f90b0e8ccca24b6d990a24ef9407ac1",
+              "size": 48886
             }
           ]
         }
