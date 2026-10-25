@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generated_at": "2026-10-25T12:10:15Z",
+  "generated_at": "2026-10-25T13:08:00Z",
   "signed": true,
   "key_id": "catalog-1",
   "repository": "https://github.com/movieclaw/movieclaw-plugins",
@@ -330,9 +330,60 @@
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=movie-voice",
       "downloads": 6,
-      "latest": "0.1.1",
-      "latest_stable": "0.1.1",
+      "latest": "0.1.2",
+      "latest_stable": "0.1.2",
       "versions": [
+        {
+          "version": "0.1.2",
+          "prerelease": false,
+          "released_at": "2026-10-25T13:08:00Z",
+          "yanked": null,
+          "notes": "- 将本轮发布编号统一为 0.1.2，完整沿用 0.1.1 的品牌图标与网页资源。\n- 保留安装标识、权限、能力链接、原配置、签名快捷指令和全部插件数据，旧版可直接升级。\n",
+          "changelog_url": "https://github.com/movieclaw/movieclaw-plugins/releases/tag/movie-voice-v0.1.2",
+          "source_url": "https://github.com/movieclaw/movieclaw-plugins/tree/movie-voice-v0.1.2/plugins/movie-voice",
+          "readme": {
+            "url": "https://raw.githubusercontent.com/movieclaw/movieclaw-plugins/movie-voice-v0.1.2/plugins/movie-voice/README.md",
+            "sha256": "d7f10677620f50c1803e6c0a0fe54d19782d2f66d0f69962f051bf4fb1abfdaf",
+            "size": 9322
+          },
+          "runtime": "process",
+          "sdk": "^1.0",
+          "requires": {
+            "agent": "^1.0",
+            "host-ops": "^1.0",
+            "plugin-routes": "^1.0",
+            "plugin-events": "^1.0",
+            "plugin-data": "^1.0"
+          },
+          "platforms": [
+            "any"
+          ],
+          "permissions": {
+            "operations": [
+              "agent:none",
+              "library.items.get",
+              "search.library",
+              "search.titles",
+              "discover.get-title-details",
+              "subscriptions.create"
+            ],
+            "paths": [],
+            "network": true,
+            "callbacks": [],
+            "events": []
+          },
+          "web": true,
+          "dependencies": null,
+          "artifacts": [
+            {
+              "platform": "any",
+              "filename": "movie-voice-0.1.2.mcplugin",
+              "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/movie-voice-v0.1.2/movie-voice-0.1.2.mcplugin",
+              "sha256": "051770bc70256fd0e1775064fa2539d9a2bd898ba89ff6651c18fa8f852cc120",
+              "size": 166391
+            }
+          ]
+        },
         {
           "version": "0.1.1",
           "prerelease": false,
@@ -777,7 +828,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=pt-site-pack",
-      "downloads": 10,
+      "downloads": 11,
       "latest": "0.1.0",
       "latest_stable": "0.1.0",
       "versions": [
