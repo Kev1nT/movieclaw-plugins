@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generated_at": "2026-10-25T13:08:00Z",
+  "generated_at": "2026-10-25T13:10:41Z",
   "signed": true,
   "key_id": "catalog-1",
   "repository": "https://github.com/movieclaw/movieclaw-plugins",
@@ -829,8 +829,8 @@
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=pt-site-pack",
       "downloads": 11,
-      "latest": "0.1.0",
-      "latest_stable": "0.1.0",
+      "latest": "0.1.2",
+      "latest_stable": "0.1.2",
       "versions": [
         {
           "version": "0.2.0",
@@ -885,6 +885,60 @@
               "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/pt-site-pack-v0.2.0/pt-site-pack-0.2.0.mcplugin",
               "sha256": "d710b6dd0f2b95fbe8c455b79b5926d8134e9e627e695a188cc521b6cb683490",
               "size": 439776
+            }
+          ]
+        },
+        {
+          "version": "0.1.2",
+          "prerelease": false,
+          "released_at": "2026-10-25T13:10:41Z",
+          "yanked": null,
+          "notes": "- 将本轮发布编号统一为 0.1.2，功能与 0.2.0 相同，继续提供每日随机签到、批量签到与访问、历史记录和账号维护。\n- 保留原安装标识、权限、站点账号、自定义适配、采集设置及维护计划；不变更持久化数据格式。\n- 历史 0.2.0 标签与附件保留，商店撤回其推荐以采用统一编号。已安装 0.2.0 的用户需手动上传 0.1.2 切换，旧 0.1.0 用户可正常升级。\n",
+          "changelog_url": "https://github.com/movieclaw/movieclaw-plugins/releases/tag/pt-site-pack-v0.1.2",
+          "source_url": "https://github.com/movieclaw/movieclaw-plugins/tree/pt-site-pack-v0.1.2/plugins/pt-site-pack",
+          "readme": {
+            "url": "https://raw.githubusercontent.com/movieclaw/movieclaw-plugins/pt-site-pack-v0.1.2/plugins/pt-site-pack/README.md",
+            "sha256": "21e73c97641aecc8c414a376841916e6b5e583092ca607e10bf6afdeb7cad590",
+            "size": 17337
+          },
+          "runtime": "inline",
+          "sdk": "^1.0",
+          "requires": {
+            "agent": "^1.0",
+            "plugin-data": "^1.0",
+            "site-classes": "^1.0",
+            "site-data-packs": "^1.0",
+            "plugin-files": "^1.0",
+            "plugin-routes": "^1.0",
+            "host-ops": "^1.0"
+          },
+          "platforms": [
+            "any"
+          ],
+          "permissions": {
+            "operations": [
+              "site.catalog",
+              "site.list",
+              "site.stats",
+              "site.verify",
+              "search.torrents",
+              "dl.tasks",
+              "agent:none"
+            ],
+            "paths": [],
+            "network": true,
+            "callbacks": [],
+            "events": []
+          },
+          "web": true,
+          "dependencies": null,
+          "artifacts": [
+            {
+              "platform": "any",
+              "filename": "pt-site-pack-0.1.2.mcplugin",
+              "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/pt-site-pack-v0.1.2/pt-site-pack-0.1.2.mcplugin",
+              "sha256": "568b0017db1bc63028b080758161d0455bac939dfeb35f68625479012a794e08",
+              "size": 440213
             }
           ]
         },
