@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generated_at": "2026-10-24T12:12:16Z",
+  "generated_at": "2026-10-25T10:47:51Z",
   "signed": true,
   "key_id": "catalog-1",
   "repository": "https://github.com/movieclaw/movieclaw-plugins",
@@ -27,7 +27,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=cloud-115",
-      "downloads": 41,
+      "downloads": 42,
       "latest": "0.1.0-beta.2",
       "latest_stable": null,
       "versions": [
@@ -261,7 +261,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=movie-voice",
-      "downloads": 4,
+      "downloads": 6,
       "latest": "0.1.0",
       "latest_stable": "0.1.0",
       "versions": [
@@ -336,7 +336,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=notifyhub",
-      "downloads": 4,
+      "downloads": 6,
       "latest": "2.3.0",
       "latest_stable": "2.3.0",
       "versions": [
@@ -423,7 +423,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=openlist-direct-link",
-      "downloads": 5,
+      "downloads": 7,
       "latest": "0.1.0",
       "latest_stable": "0.1.0",
       "versions": [
@@ -491,7 +491,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=platform-discovery",
-      "downloads": 6,
+      "downloads": 17,
       "latest": "0.11.1",
       "latest_stable": "0.11.1",
       "versions": [
@@ -609,7 +609,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=pt-site-pack",
-      "downloads": 0,
+      "downloads": 10,
       "latest": "0.1.0",
       "latest_stable": "0.1.0",
       "versions": [
@@ -687,7 +687,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=seed-scheduler",
-      "downloads": 3,
+      "downloads": 6,
       "latest": "1.1.0",
       "latest_stable": "1.1.0",
       "versions": [
@@ -771,7 +771,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/o1xhack/movieclaw-trakt/issues/new",
-      "downloads": 3,
+      "downloads": 4,
       "latest": "0.2.3",
       "latest_stable": "0.2.3",
       "versions": [
@@ -834,6 +834,94 @@
       ]
     },
     {
+      "id": "tv-home",
+      "name": "电视桌面",
+      "summary": "把厂商桌面换成 MovieClaw 桌面：开机、按主页键直达 MovieClaw 首页。",
+      "description": "把厂商桌面换成「MovieClaw 桌面」：开机、按主页键直达 MovieClaw 首页，从 MovieClaw 退出是「全部应用」。装好后对 AI 助手说「用电视桌面插件帮我给电视换桌面」，跟着引导做：电视上开调试、点允许、按主页键确认，最后关调试。不 root、不动系统分区，改动的每一步有记录、可还原。",
+      "category": "tools",
+      "author": {
+        "name": "MovieClaw",
+        "url": "https://github.com/movieclaw"
+      },
+      "homepage": "https://github.com/movieclaw/movieclaw-plugins/tree/main/plugins/tv-home",
+      "repository": "https://github.com/movieclaw/movieclaw-plugins/tree/main/plugins/tv-home",
+      "license": "见仓库许可证",
+      "origin": "official",
+      "icon": null,
+      "screenshots": [],
+      "deprecated": null,
+      "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=tv-home",
+      "downloads": 0,
+      "latest": "0.1.0",
+      "latest_stable": "0.1.0",
+      "versions": [
+        {
+          "version": "0.1.0",
+          "prerelease": false,
+          "released_at": "2026-10-25T10:47:51Z",
+          "yanked": null,
+          "notes": "- 首个版本（P1 自用闭环）。连接电视、摸底、安装 MovieClaw 与桌面壳「MovieClaw 桌面」、换默认桌面（需要时停用厂商桌面）、验证、还原、关闭调试，全部由 agent 经 `mclaw plugins tv-home …` 引导完成。\n- 换桌面与还原的顺序、防护规则沿用 cleanyourtv 踩出来的做法（MIT）：不 root、只动 /data、先写状态记录再改设备、第一次的记录不被覆盖。\n",
+          "changelog_url": "https://github.com/movieclaw/movieclaw-plugins/releases/tag/tv-home-v0.1.0",
+          "source_url": "https://github.com/movieclaw/movieclaw-plugins/tree/tv-home-v0.1.0/plugins/tv-home",
+          "readme": {
+            "url": "https://raw.githubusercontent.com/movieclaw/movieclaw-plugins/tv-home-v0.1.0/plugins/tv-home/README.md",
+            "sha256": "dd0308f726845a250d6555a5a0f0f23c4957d581b6a6b4d8ccb57ce8bcfbc7e4",
+            "size": 8281
+          },
+          "runtime": "process",
+          "sdk": "^1.0",
+          "requires": {
+            "plugin-files": "^1.0",
+            "plugin-routes": "^1.0"
+          },
+          "platforms": [
+            "any"
+          ],
+          "permissions": {
+            "operations": [],
+            "paths": [],
+            "network": true,
+            "callbacks": [],
+            "events": []
+          },
+          "web": false,
+          "dependencies": {
+            "lock": {
+              "url": "https://raw.githubusercontent.com/movieclaw/movieclaw-plugins/tv-home-v0.1.0/plugins/tv-home/requirements.lock",
+              "sha256": "418d4c388e3957933f0ef0683f291812d6e58947574914af59208d5de5516ecb",
+              "size": 884
+            },
+            "packages": [
+              {
+                "name": "adb-shell",
+                "version": "0.4.3",
+                "native": false
+              },
+              {
+                "name": "pyasn1",
+                "version": "0.6.4",
+                "native": false
+              },
+              {
+                "name": "rsa",
+                "version": "4.9.1",
+                "native": false
+              }
+            ]
+          },
+          "artifacts": [
+            {
+              "platform": "any",
+              "filename": "tv-home-0.1.0.mcplugin",
+              "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/tv-home-v0.1.0/tv-home-0.1.0.mcplugin",
+              "sha256": "14e2c475285d3d60c8071f4fb0b888a026765ce5422007f2d5961b9fa0ce91ac",
+              "size": 1397686
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "watch-friends",
       "name": "映迹",
       "summary": "私人观影足迹、高清片单、多图推荐、本人跨平台已看与续播同步，以及独立授权的互联影友。",
@@ -855,7 +943,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=watch-friends",
-      "downloads": 4,
+      "downloads": 8,
       "latest": "0.1.0",
       "latest_stable": "0.1.0",
       "versions": [
