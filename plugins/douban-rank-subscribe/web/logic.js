@@ -11,7 +11,6 @@
   // 与后端 Settings 里 rank_* 字段严格一一对应（后端有自测守着）
   const RANKS = [
     { field: "movie_weekly_best", title: "一周口碑电影榜", kind: "movie", ref: "douban:movie:movie_weekly_best" },
-    { field: "movie_real_time_hotest", title: "实时热门电影", kind: "movie", ref: "douban:movie:movie_real_time_hotest" },
     { field: "movie_hot_gaia", title: "豆瓣热门电影", kind: "movie", ref: "douban:movie:movie_hot_gaia" },
     { field: "movie_showing", title: "影院热映", kind: "movie", ref: "douban:movie:movie_showing" },
     { field: "movie_soon", title: "即将上映", kind: "movie", ref: "douban:movie:movie_soon" },

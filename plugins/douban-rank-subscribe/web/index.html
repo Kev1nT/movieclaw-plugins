@@ -8,14 +8,13 @@
 <link rel="stylesheet" href="theme.css">
 <style>
   /* 只写这一页特有的东西；版式一律走 theme.css，不要在这里重定义 */
-  /* 卡片左上角的年份小标签（评分角标已在 theme.css 里） */
-  .card .poster .year {
-    position: absolute; left: 6px; top: 6px; z-index: 2;
-    display: inline-flex; align-items: center; justify-content: center;
-    height: 20px; padding: 0 6px; border-radius: 4px;
-    font-size: 11px; font-weight: 700; line-height: 1;
-    background: rgba(0,0,0,.72); color: #fff;
-  }
+  /* 状态角标配色（本页定制）：
+     - 已订阅 → 红背景、白字
+     - 已入库 → 绿背景、白字
+     theme.css 的 .ok 默认是绿底深绿字，这里覆盖成白字（对比度更好、更醒目）。 */
+  .card .status.subbed { background: var(--mc-accent, #e50914); color: #fff; }
+  .card .status.owned { background: var(--mc-ok, #46d369); color: #fff; }
+
 
   /* 片名是可点的详情入口：给一点可点提示，但不破坏 theme.css 的字号/行高 */
   .card .name[data-detail] { cursor: pointer; }
@@ -24,11 +23,85 @@
     outline: 2px solid var(--mc-accent, #e50914); outline-offset: 2px; border-radius: 3px;
   }
 
+  /* 右侧整页滚动条隐藏：仍可滚，只是不画那条灰杠
+     （theme.css 默认给的是细灰条，这里按用户要求去掉） */
+  html, body,
+  .detail-modal .body { scrollbar-width: none; -ms-overflow-style: none; }
+  html::-webkit-scrollbar, body::-webkit-scrollbar,
+  .detail-modal .body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
   /* ---------- 详情弹窗的内容（版式外壳由 theme.css 提供） ---------- */
-  .d-hero { margin: 0 -20px 14px; height: 180px; overflow: hidden; border-radius: 10px;
-    background: color-mix(in srgb, var(--mc-text, #fff) 8%, transparent); }
-  .d-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .d-lead { padding-bottom: 4px; }
+  /* 弹窗没有 header 了：body 顶部不留白，海报直接顶到最上面 */
+  .detail-modal { overflow: hidden; }   /* 让海报被弹窗圆角裁切，不溢出边角 */
+  /* 白边单独画在最上层：
+     弹窗自己那圈 inset box-shadow 在滚动容器下面，海报一滚就把它盖住，
+     圆角弧线上也容易被切。用一层绝对定位的描边压住所有内容，
+     滚动、圆角都不影响它。 */
+  .detail-modal::after {
+    content: "";
+    position: absolute; inset: 0; z-index: 10;
+    pointer-events: none;               /* 不吃点击，遮罩/按钮照常工作 */
+    border-radius: inherit;             /* 跟随弹窗圆角 */
+    /* 四边都有白边，但「海报底部那条」不画：
+       海报渐变到正文，中间不出现一道硬分隔。 */
+    box-shadow: inset 0 1px 0 0 var(--mc-line, #404040),   /* 顶 */
+                inset 1px 0 0 0 var(--mc-line, #404040),   /* 左 */
+                inset -1px 0 0 0 var(--mc-line, #404040),  /* 右 */
+                inset 0 -1px 0 0 var(--mc-line, #404040);  /* 底 */
+  }
+  .detail-modal .body { padding-top: 0; }
+  /* 详情海报：铺满弹窗顶部（无 header），放大后模糊，上下渐变淡出。
+     四边各让出 1px：弹窗那圈白边是 inset box-shadow，画在最上层，
+     海报只要压上去就会把它盖掉。让出 1px 后白边四边完整。
+     海报自己不做圆角（直角），四个角由弹窗的 overflow:hidden 裁——
+     自己做圆角会在弧线上把描边切出一段缺口。 */
+  .d-hero {
+    position: relative;
+    /* body 已经 padding-top:0，这里不能再负值上冲：
+       留 1px 让弹窗顶部那圈白边露出来 */
+    margin: 1px -19px 0;
+    height: 300px;      /* 略加高，让渐变有更多过渡空间 */
+    overflow: hidden;
+    border-radius: 0;
+    background: #181818;
+  }
+  .d-hero img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    /* 模糊减轻后仍要略放大，否则边缘会露出原图的硬边 */
+    transform: scale(1.06);
+    filter: blur(6px) saturate(106%) brightness(.86);
+  }
+  /* 上：压一层深色，顶边不突兀；下：渐变到弹窗底色，接住正文 */
+  .d-hero::before {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(0,0,0,.40) 0%,
+      rgba(0,0,0,.12) 22%,
+      transparent 42%
+    );
+  }
+  .d-hero::after {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    /* 底部用「黑到透明」的反向渐变，让海报色调自然化进正文；
+       前面用渐变调浓，末尾保持 #181818 与正文同色，看不出接缝 */
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(24,24,24,0.12) 32%,
+      rgba(24,24,24,0.42) 58%,
+      rgba(24,24,24,0.72) 82%,
+      rgba(24,24,24,0.92) 96%,
+      #181818 100%
+    );
+  }
+  /* 与海报底边贴合，无空隙、无线 */
+  /* 标题紧贴 hero 底部：不留 padding-bottom，不加 margin，避免中间出缝 */
+  .d-lead { padding: 0 0 4px; }
+
+  /* 详情弹窗 footer 不画上边框：海报渐变和正文已经连成一片，
+     再来一条线会显得割裂（按用户要求去掉）。 */
+  .detail-modal footer { box-shadow: none; }
   .d-title { margin: 0 0 8px; font-size: 20px; font-weight: 700; line-height: 1.3;
     overflow-wrap: anywhere; }
   .d-meta { margin: 0 0 4px; font-size: 12.5px; line-height: 1.7;
@@ -63,7 +136,7 @@
   .d-rec-item span { display: block; margin-top: 4px; font-size: 11.5px; line-height: 1.4;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   @media (max-width: 720px) {
-    .d-hero { margin: 0 -16px 12px; height: 140px; }
+    .d-hero { margin: 1px -15px 0; height: 220px; }   /* 左右 -(16-1) */
   }
 </style>
 <script>
@@ -129,7 +202,6 @@
 <div class="tabs" id="tabs">
   <button class="tab on" data-tab="movie">电影 <span class="n" id="n-movie">–</span></button>
   <button class="tab" data-tab="tv">剧集 <span class="n" id="n-tv">–</span></button>
-  <span class="tab-hint" id="tab-hint"></span>
 </div>
 
 <!-- ③ 内容 -->
@@ -188,12 +260,6 @@
 <!-- ⑦ 详情弹窗（居中，看一部片子的资料） -->
 <div class="detail-scrim" id="detail-scrim"></div>
 <div class="detail-modal" id="detail-modal" aria-hidden="true">
-  <header>
-    <h2 id="detail-title">详情</h2>
-    <button class="icon-btn" id="detail-close" aria-label="关闭">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-    </button>
-  </header>
   <div class="body" id="detail-body"></div>
   <footer id="detail-footer"></footer>
 </div>
@@ -283,8 +349,12 @@
       '<span class="ph">' + esc((t.title || "?").slice(0, 2)) + "</span>" +
       (poster ? '<img loading="lazy" src="' + esc(poster) + '" alt="' + esc(t.title) + '"' +
         ' onerror="this.style.display=\'none\'">' : "") +
-      (rating ? '<span class="badge"><span class="star">★</span>' + esc(rating) + "</span>" : "") +
-      (t.release_year ? '<span class="year">' + esc(t.release_year) + "</span>" : "") +
+      // 评分：右上角 .score（规范 3.4 的评分位）
+      (rating ? '<span class="score"><span class="star">★</span>' + esc(rating) + "</span>" : "") +
+      // 状态：规范 3.4 的 .status（底部正中文字胶囊）。已入库优先，状态最多一个。
+      (owned
+        ? '<span class="status owned">已入库</span>'
+        : (sub ? '<span class="status subbed">已订阅</span>' : "")) +
       // 浮层：三颗按钮都由 CSS 按状态显示，页面只管状态
       '<div class="act">' +
       (canAct ? '<button type="button" class="act-btn consent" data-act="sub">订阅</button>' : "") +
@@ -365,7 +435,6 @@
     }
     boardEl.innerHTML = rowsHtml(groups) ||
       notice("这个门槛下没有条目", "榜单读取成功，但按当前评分门槛筛完是空的，可以在设置里调低门槛。");
-    $("#tab-hint").textContent = ranks.map(function (r) { return r.title; }).join(" · ");
   }
 
   function updateTabCounts() {
@@ -395,6 +464,14 @@
     draft = Object.assign({}, panelCfg);
     const body = $("#settings-body");
     body.innerHTML =
+      '<div class="set-group">自动订阅</div>' +
+      '<div class="set-list">' +
+      '<label class="set-row"><span class="label">自动订阅新上榜作品' +
+      '<small>关掉后只保留浏览和手动订阅，定时任务不再自动下单</small></span>' +
+      '<span class="switch"><input type="checkbox" id="f-auto"' +
+      (draft.auto_subscribe !== false ? " checked" : "") + '><span class="knob"></span></span></label>' +
+      "</div>" +
+
       '<div class="set-group">监控的榜单</div>' +
       '<div class="set-list">' +
       '<button type="button" class="set-row" id="row-movie">' +
@@ -478,6 +555,8 @@
     payload.per_rank_limit = Number($("#f-limit").value);
     payload.custom_feeds = $("#f-feeds") ? $("#f-feeds").value : (draft.custom_feeds || "");
     payload.tv_strategy = draft.tv_strategy || "follow_new";
+    const autoEl = $("#f-auto");
+    payload.auto_subscribe = autoEl ? autoEl.checked : (draft.auto_subscribe !== false);
     if (!(payload.min_rating >= 0 && payload.min_rating <= 10)) {
       msg.textContent = "评分门槛要在 0 到 10 之间"; msg.className = "status-msg err"; return;
     }
@@ -512,18 +591,18 @@
   async function openTitle(ref) {
     const t = findTitle(ref) || { title_ref: ref };
     const title = t.title || "详情";
-    MCUI.openDetail({ title: title, html: '<p class="d-hint">正在读取详情…</p>', footer: "" });
+    MCUI.openDetail({ title: "", html: '<p class="d-hint">正在读取详情…</p>', footer: "" });
     try {
       const d = await api("/api/v1/discover/titles/" + encodeURIComponent(ref));
       MCUI.openDetail({
-        title: d.title.title || title,
+        title: "",                 // 左上角不再显示片名：内容里已有大标题
         html: detailHtml(d),
         footer: detailFooter(d),
         onOpen: bindDetail,
       });
     } catch (e) {
       MCUI.openDetail({
-        title: title,
+        title: "",
         html: '<p class="d-hint">打不开这部片子的详情：' + esc(e.message) + "</p>",
         footer: '<button class="btn-plain" id="d-close">关闭</button>',
         onOpen: function () { const b = $("#d-close"); if (b) b.addEventListener("click", MCUI.closeDetail); },
@@ -654,7 +733,21 @@
       }
     });
 
-    // 片名区域 = 看详情入口（海报留给动作：点开出浮层按钮）
+    // 点海报 = 直接打开详情弹窗（与旧版一致）。
+    // 浮层胶囊按钮仍保留：点它做动作（订阅/跳转），不会误开详情。
+    boardEl.addEventListener("click", function (e) {
+      // 点的是浮层胶囊或片名区时不走这里
+      if (e.target.closest(".act-btn")) return;
+      if (e.target.closest("[data-detail]")) return;
+      const card = e.target.closest(".card");
+      if (!card || !card.dataset.ref) return;
+      openTitle(card.dataset.ref);
+      // 详情弹窗接管后，把卡片浮层收起来：关掉弹窗回到列表时
+      // 不会留下一张「展开着、还盖着半透明遮罩」的卡。
+      MCUI.closeCards();
+    }, true);   // 捕获阶段：先于 bindCards 的冒泡监听拿到点击
+
+    // 片名区域同样进详情
     boardEl.addEventListener("click", function (e) {
       const nameEl = e.target.closest("[data-detail]");
       if (!nameEl) return;
@@ -689,7 +782,6 @@
       pickerRollback = null;
       MCUI.closePicker(true);
     });
-    $("#detail-close").addEventListener("click", MCUI.closeDetail);
     $("#detail-scrim").addEventListener("click", MCUI.closeDetail);
 
     // 刷新

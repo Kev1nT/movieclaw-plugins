@@ -1,4 +1,9 @@
 /* ==========================================================================
+   ⚠ 主题变量注入时机：主程序在 iframe 的 onLoad 时才把 --mc-* 写进来。
+     所以页面首次渲染时 `var(--mc-accent, 兜底)` 用的是兜底值 —— 若兜底写「品牌红」，
+     切银玻璃/其他主题时会先闪一下红色再变成主题色（真踩过）。
+     规矩：**所有 --mc-* 的兜底值一律用中性灰**（accent 用 #b9b9b9），不要用品牌色/状态色。
+     这样「变量没到」和「变量到了、主题就这颜色」看起来几乎一样，不跳色。
    MovieClaw 插件页统一版式 v1
    来源：豆瓣同步（douban-sync 1.10.11）的页面排版，逐条抽出来复用。
    用法：在 web/index.html 的 <style> 之后引入本文件
@@ -8,6 +13,17 @@
    ========================================================================== */
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* ---------- 主题变量未就绪：整页先不画（防「先闪一下品牌色」） ---------- */
+/* 主程序在 iframe 的 onLoad 才注入 --mc-*，页面会先用兜底色画一遍再变色，用户看到「闪一下」。
+   这里的 .mc-theme-pending 由页面 <head> 的内联脚本在首帧前挂上（见 skeleton.html），
+   theme-ui.js 检测到 --mc-text 出现（或 800ms 超时）后摘掉 → 颜色只画一次。
+   与设备无关：桌面、平板、手机都走这一套。 */
+html.mc-theme-pending { opacity: 0 !important; }
+/* 兜底：万一脚本没跑（被 CSP 挡了之类），1.2 秒后也要显示出来，绝不长时间白屏 */
+html.mc-theme-pending { animation: mc-theme-reveal 0s linear 1.2s forwards; }
+@keyframes mc-theme-reveal { to { opacity: 1; } }
+
 
 /* ---------- 0. 骨架与滚动 ---------- */
 html {
@@ -86,7 +102,7 @@ a { color: inherit; text-decoration: none; }
   padding: 14px calc(var(--nav-center, 34px) - 19px) 14px var(--page-pad, 28px);
   background: var(--mc-bg, #000);
 }
-.brand { font-size: 19px; font-weight: 800; letter-spacing: .16em; color: var(--mc-accent, #e50914); line-height: 1; }
+.brand { font-size: 19px; font-weight: 800; letter-spacing: .16em; color: var(--mc-accent, #b9b9b9); line-height: 1; }
 .spacer { flex: 1; }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -150,7 +166,7 @@ a { color: inherit; text-decoration: none; }
   transition: background .16s ease, color .16s ease, border-color .16s ease;
 }
 .tab:hover { background: color-mix(in srgb, var(--mc-text, #fff) 8%, transparent); color: var(--mc-text, #fff); }
-.tab.on { background: var(--mc-accent, #e50914); border-color: var(--mc-accent, #e50914); color: #fff; }
+.tab.on { background: var(--mc-accent, #b9b9b9); border-color: var(--mc-accent, #b9b9b9); color: #fff; }
 /* 数量徽标：固定高度、等宽数字，不参与撑高 */
 .tab .n {
   display: inline-flex; align-items: center; justify-content: center;
@@ -202,7 +218,7 @@ a { color: inherit; text-decoration: none; }
 /* 右侧文字链接 / 小按钮：比胶囊再低一级，只放「看得见就点一下」的 */
 .summary .link-btn {
   padding: 0; border: 0; background: none; cursor: pointer; font: inherit;
-  font-size: 12px; color: var(--mc-accent, #e50914);
+  font-size: 12px; color: var(--mc-accent, #b9b9b9);
 }
 .summary .link-btn:hover { color: var(--mc-text, #fff); }
 
@@ -237,12 +253,12 @@ a { color: inherit; text-decoration: none; }
 .btn-plain:hover { background: color-mix(in srgb, var(--mc-text, #fff) 10%, transparent); }
 .btn-plain:disabled { opacity: .5; cursor: default; }
 /* 主要按钮：品牌红实心 */
-.btn-plain.accent { border-color: transparent; background: var(--mc-accent, #e50914); color: #fff; }
+.btn-plain.accent { border-color: transparent; background: var(--mc-accent, #b9b9b9); color: #fff; }
 .btn-plain.accent:hover { filter: brightness(1.08); }
 /* 文字链接按钮 */
 .link-btn {
   padding: 0; border: 0; background: none; cursor: pointer; font: inherit;
-  color: var(--mc-accent, #e50914); font-size: 12px;
+  color: var(--mc-accent, #b9b9b9); font-size: 12px;
 }
 .link-btn:hover { color: var(--mc-text, #fff); }
 
@@ -322,7 +338,7 @@ a { color: inherit; text-decoration: none; }
 }
 /* 主操作：品牌红实心（例：还能执行动作时给「确认请求」） */
 .card.is-open:not([data-sub]):not([data-library]) .act-btn.consent {
-  display: inline-flex; background: var(--mc-accent, #e50914); color: #fff;
+  display: inline-flex; background: var(--mc-accent, #b9b9b9); color: #fff;
 }
 /* 二次确认（点右上角 × 之后浮出的「取消请求」）：深色半透明 */
 .card.ask-dismiss .act-btn.dismiss {
@@ -333,7 +349,7 @@ a { color: inherit; text-decoration: none; }
 .card.is-open[data-library] .act-btn.to-lib {
   display: inline-flex; color: #fff; text-decoration: none;
 }
-.card.is-open[data-sub] .act-btn.to-sub { background: var(--mc-accent, #e50914); }
+.card.is-open[data-sub] .act-btn.to-sub { background: var(--mc-accent, #b9b9b9); }
 .card.is-open[data-library] .act-btn.to-lib { background: var(--mc-ok, #46d369); }
 .card.is-open[data-sub] .act-btn.to-sub:hover,
 .card.is-open[data-library] .act-btn.to-lib:hover { filter: brightness(1.1); }
@@ -361,7 +377,51 @@ a { color: inherit; text-decoration: none; }
   .card .sub { font-size: 10px; }
 }
 
-/* 右上角圆形角标：红＝订阅中（勾）/ 绿＝已入库（圆圈） */
+/* ---------- 6.1 海报角标与评分：位置、尺寸、配色统一 ---------- */
+/* 一张海报上最多三个信息位，**各管一段，互不重叠**（见 SKILL.md 第 3.4 节）：
+     ┌──────────────┐
+     │ ①评分 ★8.6    │  ← 左上：评分（只读数字，最恒定）
+     │              │
+     │ ②状态        │  ← 右上：状态（订阅中/已入库/先导中…），最多 1 个
+     │              │
+     │ ③补充        │  ← 左下：补充标签（平台、集数…），最多 2 个
+     └──────────────┘
+   为什么这么分：评分是「这部片好不好」，状态是「我跟它的关系」，补充是「技术信息」。
+   三种东西性质不同，混在一个角上就会挤成一串，用户要逐个读才知道哪个是哪个。
+   尺寸全部同一套：高 20、字号 11/700、圆角 4、内边距 0 6、行高 1——不管哪种角标都长一样。 */
+
+/* ① 评分角标（右上）：★ + 一位小数，半透明黑底
+   与状态位同处右上：评分贴最右边（固定位），状态排在它左边（见 .card .marks）。
+   为什么评分放右边：评分是最短、最恒定的数字，适合做「固定锚点」；
+   状态长短不一，放左边不影响评分的对齐。 */
+.card .score {
+  position: absolute; z-index: 3; top: 6px; right: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  height: 20px; padding: 0 6px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
+  background: rgba(0,0,0,.72); color: #fff;
+  font-variant-numeric: tabular-nums;      /* 数字等宽，两个分数并排不跳 */
+  backdrop-filter: blur(4px);
+}
+.card .score .star { color: var(--mc-warn, #e87c03); font-size: 10px; line-height: 1; }
+
+/* 右上角：评分位。
+   .marks 是「右上多个角标排一行」的容器（现在通常只装评分；旧页面里装了评分+状态也能正常工作）。
+   状态已经移到底部居中，见上面的 .status。
+     <div class="marks"><span class="score">★8.6</span></div>
+   一个角标时不用容器，直接放 .score 即可。 */
+.card .marks {
+  position: absolute; z-index: 3; top: 6px; right: 6px;
+  display: flex; align-items: center; gap: 4px;
+  max-width: calc(100% - 12px);          /* 不越过海报左边界 */
+}
+.card .marks .score, .card .marks .status, .card .marks .card-mark {
+  position: static;                      /* 在容器里改为普通流，靠 flex 排 */
+}
+.card .marks .score { order: 2; }        /* 评分保持在最右 */
+.card .marks .status { order: 1; }       /* 兜底：旧页面把状态塞进容器时排左边 */
+
+/* ② 状态角标（右上）：圆形图标 22px 或文字胶囊 20px，二选一，不许同时出现两个 */
 .card .card-mark {
   position: absolute; z-index: 3; top: 6px; right: 6px;
   width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
@@ -369,8 +429,60 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 2px 8px rgba(0,0,0,.45);
 }
 .card .card-mark svg { width: 13px; height: 13px; }
-.card .card-mark.subbed { background: var(--mc-accent, #e50914); color: #fff; }
+.card .card-mark.subbed { background: var(--mc-accent, #b9b9b9); color: #fff; }
 .card .card-mark.library { background: var(--mc-ok, #46d369); color: #fff; }
+
+/* ② 的另一种形态：用文字说状态（如「先导中 3.2h」「专属组在用」）。
+   形状与评分角标完全一致（同高同圆角同字号），只换底色。 */
+/* 状态：贴在海报底部正中（不是角上）。放底部是因为它是「最需要被读到的一句话」，
+   而角落留给恒定的小标记（评分 / 图标）；居中还能避开左右两侧的补充标签。 */
+.card .status {
+  position: absolute; z-index: 3; bottom: 6px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 20px; padding: 0 6px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
+  background: rgba(0,0,0,.72); color: #fff;
+  backdrop-filter: blur(4px);
+}
+/* 状态底色：默认半透明黑；要强调时用状态色，文字反色保证对比度 */
+.card .status.ok   { background: var(--mc-ok, #46d369); color: #0b1a10; }
+.card .status.wait { background: var(--mc-warn, #e87c03); color: #201000; }
+.card .status.bad  { background: var(--mc-danger, #ff6b6b); color: #220a0a; }
+.card .status.mut  { background: rgba(0,0,0,.62); color: #e6e6e6; }
+/* 状态前的小圆点（只有纯文字状态用；底色版不用） */
+.card .status .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+
+/* ③ 补充标签（左下）：最多 2 个，超出换行；样式与 .status 同高同圆角 */
+.tags {
+  position: absolute; bottom: 6px; left: 6px;
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+  /* 底部中央留给状态：标签最宽 34%，不会叠到中间去（不用 :has()，旧浏览器不支持） */
+  max-width: 34%;
+}
+.tag {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; line-height: 1; padding: 0 6px; border-radius: 4px;
+  height: 20px; background: rgba(0,0,0,.72); color: #fff; white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
+.tag .tag-dot { width: 5px; height: 5px; border-radius: 50%; margin-right: 4px; flex: 0 0 auto; }
+.tag.ok .tag-dot { background: var(--mc-ok, #46d369); }
+.tag.wait .tag-dot { background: var(--mc-warn, #e87c03); }
+.tag.bad .tag-dot { background: var(--mc-danger, #ff6b6b); }
+.tag.blue .tag-dot { background: #4a9eff; }
+
+/* 旧名兼容：.badge 以前到处当「右上角小标签」用，现在统一成右上状态位。
+   新页面请直接用 .score / .status / .tag，别再新增 .badge。 */
+.badge {
+  position: absolute; z-index: 3; top: 6px; right: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  height: 20px; padding: 0 6px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
+  background: rgba(0,0,0,.72); color: #fff; backdrop-filter: blur(4px);
+}
+.badge.accent { background: var(--mc-accent, #b9b9b9); color: #fff; }
+.badge .star { color: var(--mc-warn, #e87c03); font-size: 10px; line-height: 1; }
+
 /* 海报右上角的圆形 ×：常态就显示，不靠悬停才出来；点开后收起（中间只留主按钮） */
 .card .card-x {
   position: absolute; z-index: 4; top: 6px; right: 6px;
@@ -384,22 +496,11 @@ a { color: inherit; text-decoration: none; }
 .card .card-x svg { width: 13px; height: 13px; }
 .card .card-x:hover { filter: brightness(1.15); }
 .card .card-x:active { transform: scale(.9); }
-/* 点开之后右上角 × 收起来：画面中间只留那颗按钮（与豆瓣同步一致） */
+/* 点开之后右上角 × 收起来：画面中间只留那颗按钮 */
 .card.is-open .card-x,
 .card.ask-dismiss .card-x { opacity: 0; pointer-events: none; }
-/* 左下角小标签（状态） */
-.badge, .tag {
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; line-height: 1; padding: 0 6px; border-radius: 4px;
-  height: 20px; background: rgba(0,0,0,.72); color: #fff; white-space: nowrap;
-}
-.badge { position: absolute; top: 6px; right: 6px; }
-.badge.accent { background: var(--mc-accent, #e50914); }
-.tags { position: absolute; bottom: 6px; left: 6px; display: flex; flex-direction: column; gap: 4px; }
-.tag .tag-dot { width: 5px; height: 5px; border-radius: 50%; margin-right: 4px; }
-.tag.ok .tag-dot { background: var(--mc-ok, #46d369); }
-.tag.wait .tag-dot { background: var(--mc-warn, #e87c03); }
-.tag.bad .tag-dot { background: var(--mc-danger, #ff6b6b); }
+/* 右上角同时有状态和 × 时：× 盖在状态上，点开后状态也让位 */
+.card.is-open .card-mark, .card.is-open .status { opacity: 0; }
 
 /* ---------- 7.1 主页点击：没有独立窗口，用海报上的浮层 ---------- */
 /* v1.2 起明确：主页点海报/卡片**不弹窗口、不弹菜单**，就在这张海报正中浮出一颗胶囊按钮。
@@ -562,7 +663,7 @@ a { color: inherit; text-decoration: none; }
   display: inline-flex; align-items: center; justify-content: center;
   height: 38px; padding: 0 18px; font-size: 14px; line-height: 1; white-space: nowrap;
 }
-.detail-modal footer .btn-plain.accent { border-color: transparent; background: var(--mc-accent, #e50914); color: #fff; }
+.detail-modal footer .btn-plain.accent { border-color: transparent; background: var(--mc-accent, #b9b9b9); color: #fff; }
 /* 宽内容分两栏（左：规格对照表；右：进度与操作），窄屏自动堆成一栏 */
 .detail-modal .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 28px; }
 /* 手机：宽度吃满、高度占满可用区域 */
@@ -613,7 +714,7 @@ a { color: inherit; text-decoration: none; }
     color: var(--mc-text, #fff);
 }
 .drawer footer .cancel:hover { background: color-mix(in srgb, var(--mc-text, #fff) 22%, transparent); }
-.drawer footer .save { background: var(--mc-accent, #e50914); color: #fff; }
+.drawer footer .save { background: var(--mc-accent, #b9b9b9); color: #fff; }
 .drawer footer .save:hover { filter: brightness(1.08); }
 .drawer footer .save:disabled { opacity: .55; cursor: default; filter: none; }
 .status-msg { font-size: 12.5px; }
@@ -667,7 +768,7 @@ button.set-row:hover { background: color-mix(in srgb, var(--mc-text, #fff) 5%, t
     min-height: 84px; resize: vertical;
     font-family: ui-monospace, monospace; font-size: 12.5px; line-height: 1.55;
 }
-.set-block input:focus, .set-block textarea:focus { border-color: var(--mc-accent, #e50914); }
+.set-block input:focus, .set-block textarea:focus { border-color: var(--mc-accent, #b9b9b9); }
 /* 行内的小输入框（如「只看最近 N 天」的数字） */
 .set-row .inline-num {
     -webkit-appearance: none; appearance: none;
@@ -675,7 +776,7 @@ button.set-row:hover { background: color-mix(in srgb, var(--mc-text, #fff) 5%, t
     color: var(--mc-text, #fff); background: color-mix(in srgb, var(--mc-text, #fff) 8%, transparent);
     border: 1px solid var(--mc-line, #333); border-radius: 8px; outline: none;
 }
-.set-row .inline-num:focus { border-color: var(--mc-accent, #e50914); }
+.set-row .inline-num:focus { border-color: var(--mc-accent, #b9b9b9); }
 .set-row .unit { font-size: 13px; color: var(--mc-text-muted, #9a9a9a); }
 
 /* 开关：iOS 那种滑块，整行都可点 */
@@ -688,8 +789,8 @@ button.set-row:hover { background: color-mix(in srgb, var(--mc-text, #fff) 5%, t
     background: color-mix(in srgb, var(--mc-text, #fff) 20%, transparent);
     transition: background .16s ease;
 }
-.switch input:checked { background: var(--mc-accent, #e50914); }
-.switch input:focus-visible { outline: 2px solid var(--mc-accent, #e50914); outline-offset: 2px; }
+.switch input:checked { background: var(--mc-accent, #b9b9b9); }
+.switch input:focus-visible { outline: 2px solid var(--mc-accent, #b9b9b9); outline-offset: 2px; }
 .switch .knob {
     position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
     border-radius: 50%; background: #fff; pointer-events: none;
@@ -744,7 +845,7 @@ label.set-row { cursor: pointer; }
 }
 .picker footer .btn-plain { background: color-mix(in srgb, var(--mc-text, #fff) 14%, transparent); color: var(--mc-text, #fff); }
 .picker footer .btn-plain:hover { background: color-mix(in srgb, var(--mc-text, #fff) 22%, transparent); }
-.picker footer .done { background: var(--mc-accent, #e50914); color: #fff; }
+.picker footer .done { background: var(--mc-accent, #b9b9b9); color: #fff; }
 .picker footer .done:hover { filter: brightness(1.08); }
 .picker footer .done:disabled { opacity: .55; cursor: default; filter: none; }
 /* 单选项：整行可点，选中的打勾 */
@@ -759,8 +860,8 @@ label.set-row { cursor: pointer; }
   border: 1.5px solid color-mix(in srgb, var(--mc-text, #fff) 38%, transparent);
   display: flex; align-items: center; justify-content: center;
 }
-.opt[aria-selected="true"] .mark { border-color: var(--mc-accent, #e50914); }
-.opt[aria-selected="true"] .mark::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--mc-accent, #e50914); }
+.opt[aria-selected="true"] .mark { border-color: var(--mc-accent, #b9b9b9); }
+.opt[aria-selected="true"] .mark::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--mc-accent, #b9b9b9); }
 .opt .txt b { display: block; font-size: 14px; font-weight: 600; }
 .opt .txt small { display: block; margin-top: 3px; font-size: 11.5px; line-height: 1.5; color: var(--mc-text-muted, #8e8e8e); }
 .picker .tip { font-size: 11.5px; color: var(--mc-text-muted, #8e8e8e); line-height: 1.6; margin: 10px 0 0; }

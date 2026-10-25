@@ -169,6 +169,42 @@
     okBtn.onclick = async () => { close(); await onYes(); };
   }
 
+  /* ================= 主题变量就绪前，先别显示 ================= */
+  /* 主程序是在 iframe 的 onLoad 时才把 --mc-* 写进本页的（看主程序源码确认过：
+     注入逻辑挂在 iframe 的 onLoad 回调里）。也就是说：页面脚本、CSS 早就跑完了，
+     主题色却还没到 → 先按兜底色画一遍，变量到了再变一次，用户看到「闪一下色」。
+     与设备无关，桌面/平板/手机全都一样，跟「移动端」没有关系。
+
+     做法：首帧给 <html> 打 .mc-theme-pending（整页 opacity:0），等到下面任一条件成立再撤掉：
+       1. documentElement 上真的出现了 --mc-text（主程序注入完成的标志）；
+       2. 兜底超时 800ms（主程序异常/独立打开页面时，不能一直白屏）。
+     这样颜色只画一次，永远不会看到「先红后灰」。 */
+  const THEME_PENDING_CLASS = "mc-theme-pending";
+  function themeReady() {
+    const cs = getComputedStyle(document.documentElement);
+    return !!(cs.getPropertyValue("--mc-text") || "").trim();
+  }
+  function dismissThemePending() {
+    document.documentElement.classList.remove(THEME_PENDING_CLASS);
+  }
+  function watchTheme() {
+    const html = document.documentElement;
+    if (!html.classList.contains(THEME_PENDING_CLASS)) return;   // 页面已经自己处理过
+    if (themeReady()) { dismissThemePending(); return; }
+    let done = false;
+    const finish = () => { if (!done) { done = true; dismissThemePending(); } };
+    // 变量一出现就立刻显示（MutationObserver 盯 style 属性变化，比轮询快一帧）
+    if (typeof MutationObserver === "function") {
+      const mo = new MutationObserver(() => { if (themeReady()) { mo.disconnect(); finish(); } });
+      mo.observe(html, { attributes: true, attributeFilter: ["style", "data-theme"] });
+      setTimeout(() => mo.disconnect(), 1200);
+    }
+    // 兜底：最多等 800ms，宁可短暂用兜底色，也不许一直不显示
+    setTimeout(finish, 800);
+    // 已经在同一帧里就有变量（独立打开页面等情况）
+    requestAnimationFrame(() => { if (themeReady()) finish(); });
+  }
+
   /* ================= 分段标签条：单行横滑 ================= */
   /* 结构：<div class="tabs"> <button class="tab">…</button> … </div>
      自动做三件事：
@@ -229,12 +265,6 @@
       // 浮层里的按钮：先处理，别冒泡成「展开/收起」
       const btn = e.target.closest(".act-btn");
       if (btn) {
-        // 带 href 的浮层按钮（「前往订阅」「前往媒体库」）是真链接：
-        // 必须交给浏览器跳转，不能 preventDefault，否则点了毫无反应。
-        if (btn.tagName === "A" && btn.getAttribute("href")) {
-          e.stopPropagation();
-          return;
-        }
         e.preventDefault(); e.stopPropagation();
         if (btn.disabled) return;
         if (typeof onAct === "function") onAct(btn.dataset.act, btn, btn.closest(".card"));
@@ -331,6 +361,9 @@
   // 页面里没接住的报错写进 console，方便排查（主程序也会汇总插件页报错）
   window.addEventListener("error", (e) => console.error("[plugin-page]", e.message));
 
+  // 每页都自动执行一次：变量到了就显示，别让页面一直藏着
+  try { watchTheme(); } catch (err) { dismissThemePending(); }
+
   const MCUI = {
     $, $$, esc, api, post, toast,
     openDrawer, closeDrawer,
@@ -338,6 +371,7 @@
     openPicker, closePicker, singlePicker,
     bindCards, closeCards, askOnCard,
     bindTabs, revealActiveTab,
+    themeReady, dismissThemePending, watchTheme,
     togglePanel, closePanel, isPanelOpen,
     confirm: confirmBox,
   };

@@ -41,7 +41,6 @@ TASK_KEY = f"{PLUGIN_ID}.refresh"
 # 不经过原生设置表单。名单固定，新增榜单只需往下面加一行。
 RANK_CHOICES: tuple[tuple[str, str, str], ...] = (
     ("movie_weekly_best", "豆瓣一周口碑电影榜", "douban:movie:movie_weekly_best"),
-    ("movie_real_time_hotest", "豆瓣实时热门电影", "douban:movie:movie_real_time_hotest"),
     ("movie_hot_gaia", "豆瓣热门电影", "douban:movie:movie_hot_gaia"),
     ("movie_showing", "影院热映", "douban:movie:movie_showing"),
     ("movie_soon", "即将上映", "douban:movie:movie_soon"),
@@ -76,6 +75,7 @@ SETTINGS_KEY = "settings"
 
 #: 面板设置的默认值与取值范围（网页端与后端共用同一份口径）
 DEFAULTS: dict[str, Any] = {
+    "auto_subscribe": True,
     "min_rating": 7.0,
     "per_rank_limit": 30,
     "tv_strategy": "follow_new",
@@ -91,6 +91,7 @@ class PanelSettings(BaseModel):
 
     model_config = {"extra": "allow"}   # 榜单开关是动态拼出来的键，放行
 
+    auto_subscribe: bool = True
     min_rating: float = Field(default=7.0, ge=0, le=10)
     per_rank_limit: int = Field(default=30, ge=1, le=500)
     tv_strategy: TvStrategy = Field(default=TvStrategy.FOLLOW_NEW)
@@ -101,6 +102,7 @@ def normalize_panel(raw: Any) -> dict[str, Any]:
     """把存储里的值整理成一份完整、可信的设置（缺项补默认、类型不对回退）。"""
     data = dict(raw) if isinstance(raw, dict) else {}
     out: dict[str, Any] = dict(DEFAULTS)
+    out["auto_subscribe"] = data.get("auto_subscribe") is not False   # 缺省视为开
     try:
         out["min_rating"] = min(10.0, max(0.0, float(data.get("min_rating", DEFAULTS["min_rating"]))))
     except (TypeError, ValueError):
@@ -542,6 +544,9 @@ async def apply(ctx: Context[Settings]) -> None:
 
     async def scheduled() -> None:
         panel = await load_panel()
+        # 总开关关掉时定时任务什么都不做（页面仍可浏览榜单、手动订阅）
+        if not panel.get("auto_subscribe", True):
+            return
         if not enabled_ranks_from(panel) and not parse_custom_feeds(panel["custom_feeds"]):
             return
         await refresh_once()
@@ -661,6 +666,16 @@ async def apply(ctx: Context[Settings]) -> None:
     )
     async def run_now() -> dict:
         panel = await load_panel()
+        # 自动订阅关着时，「立即扫描」也不下单：否则误点一次就批量订阅，开关形同虚设。
+        # 页面上的单张卡片仍可手动点「订阅」，那条走 /subscribe，不受此限。
+        if not panel.get("auto_subscribe", True):
+            return {
+                "ranks": 0,
+                "custom_feeds": 0,
+                "subscribed": 0,
+                "skipped": 0,
+                "message": "自动订阅已关闭；需要订阅请直接点海报上的「订阅」",
+            }
         if not enabled_ranks_from(panel) and not parse_custom_feeds(panel["custom_feeds"]):
             return {
                 "ranks": 0,
