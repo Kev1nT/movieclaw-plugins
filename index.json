@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generated_at": "2026-10-25T10:59:47Z",
+  "generated_at": "2026-10-25T11:56:28Z",
   "signed": true,
   "key_id": "catalog-1",
   "repository": "https://github.com/movieclaw/movieclaw-plugins",
@@ -261,7 +261,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=douban-rank-subscribe",
-      "downloads": 0,
+      "downloads": 1,
       "latest": "1.0.0",
       "latest_stable": "1.0.0",
       "versions": [
@@ -330,9 +330,60 @@
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=movie-voice",
       "downloads": 6,
-      "latest": "0.1.0",
-      "latest_stable": "0.1.0",
+      "latest": "0.1.1",
+      "latest_stable": "0.1.1",
       "versions": [
+        {
+          "version": "0.1.1",
+          "prerelease": false,
+          "released_at": "2026-10-25T11:56:28Z",
+          "yanked": null,
+          "notes": "- 统一插件市场、页面标题与网页图标：深青底、奶油金放映光束、搜索镜头与薄荷绿弧线；侧栏使用随主题着色的单色版本；配套快捷指令保留现有图标。\n- 保留原安装标识、账号配置、能力链接和配套快捷指令文件；直接升级无需卸载或重配。\n",
+          "changelog_url": "https://github.com/movieclaw/movieclaw-plugins/releases/tag/movie-voice-v0.1.1",
+          "source_url": "https://github.com/movieclaw/movieclaw-plugins/tree/movie-voice-v0.1.1/plugins/movie-voice",
+          "readme": {
+            "url": "https://raw.githubusercontent.com/movieclaw/movieclaw-plugins/movie-voice-v0.1.1/plugins/movie-voice/README.md",
+            "sha256": "8b2e460955641dae5a2de3ee9046e96818ff181e52514158c181c57bf60b97c8",
+            "size": 9322
+          },
+          "runtime": "process",
+          "sdk": "^1.0",
+          "requires": {
+            "agent": "^1.0",
+            "host-ops": "^1.0",
+            "plugin-routes": "^1.0",
+            "plugin-events": "^1.0",
+            "plugin-data": "^1.0"
+          },
+          "platforms": [
+            "any"
+          ],
+          "permissions": {
+            "operations": [
+              "agent:none",
+              "library.items.get",
+              "search.library",
+              "search.titles",
+              "discover.get-title-details",
+              "subscriptions.create"
+            ],
+            "paths": [],
+            "network": true,
+            "callbacks": [],
+            "events": []
+          },
+          "web": true,
+          "dependencies": null,
+          "artifacts": [
+            {
+              "platform": "any",
+              "filename": "movie-voice-0.1.1.mcplugin",
+              "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/movie-voice-v0.1.1/movie-voice-0.1.1.mcplugin",
+              "sha256": "f2bcfecbe9216609cc5c9de4c980bee856ac6f8b01f110a8c354d715bab9275e",
+              "size": 166295
+            }
+          ]
+        },
         {
           "version": "0.1.0",
           "prerelease": false,
@@ -881,7 +932,7 @@
       "screenshots": [],
       "deprecated": null,
       "feedback_url": "https://github.com/movieclaw/movieclaw-plugins/issues/new?template=plugin-feedback.yml&plugin=seed-scheduler",
-      "downloads": 6,
+      "downloads": 7,
       "latest": "1.1.0",
       "latest_stable": "1.1.0",
       "versions": [
