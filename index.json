@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generated_at": "2026-10-25T10:50:55Z",
+  "generated_at": "2026-10-25T10:56:59Z",
   "signed": true,
   "key_id": "catalog-1",
   "repository": "https://github.com/movieclaw/movieclaw-plugins",
@@ -650,6 +650,51 @@
               "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/platform-discovery-v0.11.0/platform-discovery-0.11.0.mcplugin",
               "sha256": "888f754774dd23fd6106a02ee95cf477a0f34d2ce8fe9a0589bf509937b5b37f",
               "size": 353091
+            }
+          ]
+        },
+        {
+          "version": "0.1.0",
+          "prerelease": false,
+          "released_at": "2026-10-25T10:56:59Z",
+          "yanked": null,
+          "notes": "统一正式版本编号为 0.1.0，功能沿用 0.11.1，不回退实现。内部插件 ID、权限、配置字段、账号作用域、数据键及文件格式均不变，现有偏好、片单和缓存继续复用。旧版本记录保留。\n\n已安装 0.11.1 的用户可上传本次重新打包的 0.1.0 并批准切换，无需卸载或清除数据；先备份并保留原包。不要使用早期同名测试包。0.1.0 的语义版本小于 0.11.1，商店不会将其提示为普通升级；官方签名包及商店推荐版本由维护者协调发布。\n",
+          "changelog_url": "https://github.com/movieclaw/movieclaw-plugins/releases/tag/platform-discovery-v0.1.0",
+          "source_url": "https://github.com/movieclaw/movieclaw-plugins/tree/platform-discovery-v0.1.0/plugins/platform-discovery",
+          "readme": {
+            "url": "https://raw.githubusercontent.com/movieclaw/movieclaw-plugins/platform-discovery-v0.1.0/plugins/platform-discovery/README.md",
+            "sha256": "76c5ab59c780e66c8806df5787549f421b914e0eb1e76b0d6ce54f5d6985e88a",
+            "size": 13344
+          },
+          "runtime": "inline",
+          "sdk": "^1.0",
+          "requires": {
+            "host-ops": "^1.0",
+            "plugin-routes": "^1.0",
+            "plugin-data": "^1.0"
+          },
+          "platforms": [
+            "any"
+          ],
+          "permissions": {
+            "operations": [
+              "discover.get-title-details",
+              "discover.filter-titles"
+            ],
+            "paths": [],
+            "network": true,
+            "callbacks": [],
+            "events": []
+          },
+          "web": true,
+          "dependencies": null,
+          "artifacts": [
+            {
+              "platform": "any",
+              "filename": "platform-discovery-0.1.0.mcplugin",
+              "url": "https://github.com/movieclaw/movieclaw-plugins/releases/download/platform-discovery-v0.1.0/platform-discovery-0.1.0.mcplugin",
+              "sha256": "74896dd3c98a18b1b505a430ac17b6ff2b9dc0cdbabf9ddb0fd8323f25a10c22",
+              "size": 355881
             }
           ]
         }
