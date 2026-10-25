@@ -237,7 +237,9 @@ class BaselineStringTest(unittest.TestCase):
 
 class IsPermanentErrorTest(unittest.TestCase):
     def exc(self, status):
-        err = OpsError("op", "boom")
+        # 真实签名是 OpsError(status, code, message, details=None)；
+        # 需要「没有状态码」「状态码是字符串」这类用例时先按合法值构造再改属性。
+        err = OpsError(0, "op", "boom")
         err.status = status
         return err
 
@@ -251,9 +253,8 @@ class IsPermanentErrorTest(unittest.TestCase):
 
     def test_missing_status_is_not_permanent(self):
         # 拿不到状态码（网络层直接抛）时宁可下轮重试，也不要永久放弃
-        self.assertFalse(is_permanent_error(OpsError("op", "boom")))
-        self.assertFalse(is_permanent_error(self.exc("500")))
         self.assertFalse(is_permanent_error(self.exc(None)))
+        self.assertFalse(is_permanent_error(self.exc("500")))
 
 
 class SeasonsMissingTest(unittest.TestCase):

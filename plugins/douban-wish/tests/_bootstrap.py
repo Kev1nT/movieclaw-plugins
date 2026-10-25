@@ -77,12 +77,18 @@ else:
         pass
 
     class _OpsError(Exception):
-        """``OpsError("op", "boom")``：测试里只关心 ``.status``。"""
+        """``OpsError(status, code, message, details=None)``：与真实 SDK 签名一致。
 
-        def __init__(self, *args, **_kwargs):
-            super().__init__(*args)
-            self.message = args[-1] if args else ""
-            self.status = None
+        签名对齐是关键：装了 movieclaw_sdk 时测试用真实类，没装时用这个桩，
+        两者行为必须一样，否则 CI 绿、本地红（或反过来）。
+        """
+
+        def __init__(self, status=0, code="", message="", details=None):
+            super().__init__(f"{code}: {message}" if code or message else "")
+            self.status = status
+            self.code = code
+            self.message = message
+            self.details = details
 
     def _field_validator(*_args, **_kwargs):
         def _wrap(func):
